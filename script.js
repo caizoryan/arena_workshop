@@ -50,11 +50,17 @@ let app = () => {
 		style ---
 		*{margin: 0; padding: 0;}
 			.editor {
-				width: 50%;
+				width: 95%;
 				height: 80vh;
 				display: grid;
 				grid-template-rows: 1fr 8fr 1fr;
 			}
+		.editor > * {
+			margin: 10px;
+			border: 1px dotted black;
+			border-radius: 10px;
+			box-shadow: 0 0 10px 5px rgba(0,0,0,.1);
+		}
 		.container {
 			width: 100vw;
 			height: 100vh;
@@ -98,9 +104,9 @@ function code_element(element, index) {
 
 	mounted(() => {
 		let editor = new EditorView({
-			doc: memo_code(),
 			parent: document.querySelector(".editor-" + index()),
 			state: EditorState.create({
+				doc: memo_code(),
 				extensions: [
 					basicSetup,
 					javascript(),
