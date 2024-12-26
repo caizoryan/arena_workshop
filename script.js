@@ -1,4 +1,4 @@
-import { render, html, mem, mut, eff_on, mounted } from "./solid_monke/solid_monke.js";
+import { render, html, mem, mut, eff_on, mounted, sig } from "./solid_monke/solid_monke.js";
 import {
 	EditorState, EditorView, basicSetup, javascript, keymap,
 	esLint, lintGutter, linter, openLintPanel, Linter
@@ -9,6 +9,15 @@ import {
 let model = mut({})
 
 model.code_list = [{ type: "default", code: "" }]
+
+
+//* Code element
+// implements
+// - onselect -> when widget is selected
+// - ondeselect -> when widget is deselected *optional
+// - onediting -> when widget is focused, starting to edit
+// - onenter -> when alt+enter is pressed
+// - render -> render the widget onto element
 
 
 let template_start = `
@@ -25,27 +34,18 @@ let template_end = `</script>`
 
 eff_on(() => model.code_list, () => {
 	console.log("code_list changed")
+	console.log("code_list", model.code_list)
 	setTimeout(() => {
 		window.M = document.querySelector("iframe")?.contentDocument.model
 	}, 100);
 })
 
 let compiled = mem(() => {
-	console.log(model.code_list)
-	console.log("compiling")
-	let all = model.code_list.map(code => {
-		return code.code
-	})
-
-	let code = all.join("\n")
-
-	console.log("code", code)
-
+	let code = model.code_list.map(code => code.code).join("\n")
 	return template_start + code + template_end
 })
 
 let app = () => {
-	let indexes = mem(() => model.code_list.map((_, i) => i))
 	return html`
 		style ---
 		*{margin: 0; padding: 0;}
@@ -72,7 +72,7 @@ let app = () => {
 		div.container
 			div.editor
 				textarea [value=${template_start}]
-				each of ${() => model.code_list} as ${code_element}
+				each of ${() => model.code_list} as ${any_widget}
 				textarea [value=${template_end}]
 			iframe [srcdoc=${compiled} width=98% height=98% ]
 `
@@ -98,8 +98,52 @@ const recursive_fucking_children = (doc) => {
 	return text;
 };
 
+function any_widget(element, index) {
+	if (element.type == "default") return code_element(element, index).render
+	if (element.type == "number_variable_widget") return number_variable_widget(element, index).render
+}
+
+function number_variable_widget(element, index) {
+	let num = sig(element.num ? element.num : 0)
+	let name = sig(element.name ? element.name : "variable")
+
+	eff_on(num, () => {
+		if (window.M && window.M[name()]) window.M[name()] = num()
+	})
+
+	let r = () => html`
+		div
+			span -- model.
+			input [ type=text oninput = ${(e) => { name.set(e.target.value); console.log(e.target.value, name()); }} value=${element.name} ]
+
+			span -- = 
+
+			input [ type = range oninput=${(e) => num.set(e.target.value)} ]
+			span -- ${num}
+
+			button [ onclick = ${() => {
+
+			(function() {
+				element.num = num()
+				element.name = name()
+				set_code(index(), `model.${name()} = ${num()}`)
+			})()
+
+		}}  ] -- set
+			p -- ${() => element.code}
+`
+
+
+
+	return ({
+		render: r,
+		onselect: () => { },
+		onediting: () => { },
+		onenter: () => { },
+	})
+}
+
 function code_element(element, index) {
-	console.log("code_element", element, index)
 	let memo_code = mem(() => element.code ? element.code : "")
 
 	mounted(() => {
@@ -124,9 +168,6 @@ function code_element(element, index) {
 			})
 		})
 
-		console.log("focusing editor, curs", element.cursor)
-		console.log("cursor", element.cursor)
-
 		editor.focus()
 
 		setTimeout(() => {
@@ -137,82 +178,27 @@ function code_element(element, index) {
 		}, 10)
 	})
 
-	let archive = () => {
-		if (e.key === "Enter" && e.altKey) {
-			console.log("element", element)
-			console.log("enter", e.target.value);
-			set_code(index(), e.target.value)
-			console.log("element after change", element)
-			setTimeout(() => {
-				console.log(model.code_list[0], element.code)
-				console.log("focus", e.target.focus)
-				e.target.focus()
-			}, 750);
-		}
-	}
-	return html`
-				div [ class = ${"editor-" + index()}]    
-	`
+	return ({
+		render: () => html`div [ class = ${"editor-" + index()}]`,
+		onselect: () => { },
+		onediting: () => { },
+		onenter: () => { },
+	})
 }
 
-// function recomiple(){
-// 	model
-// }
-//
-//
 
 render(app, document.body);
 
 window.onload = () => {
-	console.log("loaded")
 	window.onkeydown = (e) => {
-		if (e.key == "n" && e.ctrlKey) {
+		if (e.key == "t" && e.ctrlKey) {
 			model.code_list = [...model.code_list, { type: "default", code: "" }]
 		}
 
+		if (e.key == "n" && e.ctrlKey) {
+			model.code_list = [...model.code_list, { type: "number_variable_widget", code: "" }]
+		}
+
 	}
 }
 
-function splitAndExtract(str) {
-	const splitStrings = [];
-	const extractedValues = [];
-
-	let currentValue = '';
-	let inBraces = false;
-
-	let assembling_string = ""
-
-
-	for (let i = 0; i < str.length; i++) {
-		const char = str[i];
-
-		let peekNext = () => str[i + 1];
-
-		if (char === "{" && inBraces) { continue }
-		if (char === '$' && peekNext() === '{') {
-			inBraces = true;
-			splitStrings.push(assembling_string);
-			assembling_string = ''
-		}
-
-		else if (char === '}') {
-			inBraces = false;
-			if (currentValue.trim() !== '') {
-				extractedValues.push(currentValue.trim());
-				currentValue = '';
-			}
-		} else if (inBraces) {
-			currentValue += char;
-		} else {
-			assembling_string += char
-		}
-
-		// on last
-		if (i === str.length - 1) {
-			splitStrings.push(assembling_string);
-		}
-	}
-
-	console.log("splitStrings", splitStrings)
-	return { strings: splitStrings, extracted: extractedValues };
-}
