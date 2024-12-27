@@ -62,3 +62,34 @@ function splitAndExtract(str) {
 	console.log("splitStrings", splitStrings)
 	return { strings: splitStrings, extracted: extractedValues };
 }
+
+/// --------------------
+let r = mem(() => model.s * 2)
+let f = mem(() => "font-size: " + model.v + "px;" +
+	"background-color: " + "rgba(" + model.s * 2 + "," + model.v * 2 + ",255, .7);")
+render(() => html`p [style=${f}] -- ${f} ${r}`, document.body)
+
+/// --------------------
+let x = mem(() => model.x)
+let y = mem(() => model.y)
+let z = mem(() => model.z)
+let a = mem(() => model.a)
+
+
+
+function color_mem(g, b) {
+	let style = mem(() => `
+padding: ${a() * 2}px;
+margin: ${x()}px;
+background-color: rgba(${x() * 2}, ${g}, ${b}, ${y() / 100});
+font-size: ${z()}px;
+`)
+	return style
+
+}
+
+render(() => html`
+  p [ style=${color_mem(0, 255)}] -- ${x}, ${() => model.y}, ${() => model.z}, ${() => model.a}
+  p [ style=${color_mem(255, 0)}] -- ${x}, ${() => model.y}, ${() => model.z}, ${() => model.a}
+ `,
+	document.body)

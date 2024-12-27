@@ -65820,6 +65820,7 @@ Vim.defineEx(
   }
 );
 export {
+  Compartment,
   EditorState,
   EditorView,
   eslint4b_es_default as Linter,

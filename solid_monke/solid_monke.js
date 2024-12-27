@@ -78,7 +78,7 @@ const eff_on = (dep, callback) => eff(on(typeof dep === "function" ? dep : () =>
 
 // Rendering Control Flow,
 // Essentially the for loop —> but for rendering (keyed) 
-const each = (dep, children) => () => For({ each: typeof dep === "function" ? dep() : (() => dep)(), children });
+const each = (dep, children) => () => For({ each: typeof dep === "function" ? dep() : dep, children });
 
 // The switch statement for rendering
 /**
@@ -164,7 +164,8 @@ export {
   img, video,
   dukan, prod, mounted, mut,
   inn, every,
-  renderToString as render_to_string
+  renderToString as render_to_string,
+  For
 }
 
 const if_then_object = (obj) => {

@@ -1,6 +1,6 @@
 import { EditorView, basicSetup } from "codemirror";
 import { keymap } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment } from "@codemirror/state";
 import { Vim, vim } from "@replit/codemirror-vim";
 import { markdown } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -86,5 +86,6 @@ export {
   javascript,
   esLint,
   lintGutter, linter, openLintPanel,
-  Linter
+  Linter,
+  Compartment,
 };
