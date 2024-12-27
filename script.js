@@ -31,13 +31,7 @@ document.M = M
 `
 
 let template_end = `</script>`
-
-eff_on(model.code_list, () => {
-	console.log("code_list changed")
-	setTimeout(() => {
-		window.M = document.querySelector("iframe")?.contentDocument.M
-	}, 100);
-})
+let m = () => document.querySelector("iframe")?.contentDocument.M
 
 let compiled = mem(() => {
 	let code = model.code_list.map(code => code.code).join("\n")
@@ -75,7 +69,9 @@ function number_variable_widget(element) {
 		el.code = `M.${name()} = ${num()}`
 	}
 
-	eff_on(num, () => window.M ? window.M[name()] = num() : null)
+	eff_on(num, () => {
+		m() ? m()[name()] = num() : null
+	})
 
 	let r = () => html`
 		style ---
@@ -232,10 +228,10 @@ function widget(element) {
 
 	let onmousemove = (e) => vect.set({ x: e.layerX, y: e.layerY })
 	eff_on(vect, () => {
-		if (window.M) {
-			window.M["vect_x"] = vect().x
-			window.M["vect_y"] = vect().y
-			console.log("setting vect", window.M["vect_x"], window.M["vect_y"])
+		if (m()) {
+			m()["vect_x"] = vect().x
+			m()["vect_y"] = vect().y
+			console.log("setting vect", m()["vect_x"], m()["vect_y"])
 		}
 	})
 
