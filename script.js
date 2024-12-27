@@ -10,8 +10,6 @@ let model = mut({})
 
 model.code_list = [{ type: "default", code: "" }]
 
-
-
 //* Code element
 // implements
 // - onselect -> when widget is selected
@@ -48,7 +46,7 @@ let compiled = mem(() => {
 let app = () => {
 	let list = () => model.code_list
 	return h("div.container", [
-		h("div.editor", each(list, any_widget)),
+		h("div.editor", each(list, (a, e) => any_widget(a, e))),
 		h("iframe", { srcdoc: compiled, width: "98%", height: "98%" })
 	])
 }
@@ -215,7 +213,6 @@ function code_element(element, index) {
 			let text = recursive_fucking_children(editor.state.doc).join("\n");
 			set_code(index(), text)
 			element.cursor = editor.state.selection.ranges[0].from
-
 		}
 
 

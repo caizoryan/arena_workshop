@@ -33,7 +33,7 @@ import {
   Switch,
   onMount,
   createStore, produce, createMutable,
-  render, renderToString
+  render
 } from "./mini-solid.js";
 import { h as html } from "./concise_html/index.js";
 
@@ -148,8 +148,7 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
 
 // This is utilities for larger reactive structures 
-const dukan = createStore;
-const prod = produce;
+const store = createStore;
 const mounted = onMount;
 const mut = createMutable;
 
@@ -162,9 +161,8 @@ export {
   eff, eff_on, each, if_then, button,
   when, div, span, p, a, h1, h2, h3, h4, br, $, $$,
   img, video,
-  dukan, prod, mounted, mut,
+  store, produce, mounted, mut,
   inn, every,
-  renderToString as render_to_string,
   For
 }
 
