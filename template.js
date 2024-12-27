@@ -95,16 +95,61 @@ render(() => html`
 	document.body)
 
 /// --------------------
-
-
-let style = mem(() =>
+let _style = mem(() =>
 	`position: absolute;
-top: ${M.vect_y}px;
-left: ${M.vect_x}px;
+top: ${M.vect.y * 8}px;
+left: ${M.vect.x * 3}px;
 width: 100px;
 height: 100px;
-background: red;`)
+padding: 100px;
+background: green;`)
+
+render(() => html`div [style=${style}]`, document.body)
+
+M.location = {
+	x: 102,
+	y: 95
+}
+
+
+let style = mem(() => `
+position: absolute;
+top: ${M.location?.y * M.b}px;
+left: ${M.location?.x * M.b}px;
+width: 100px;
+height: 100px;
+padding: 100px;
+background: green;`)
+
+
+
+let style2 = mem(() =>
+	`position: absolute;
+top: ${M.vect2?.y * M.b}px;
+left: ${M.vect2?.x * M.b}px;
+width: 300px;
+height: 300px;
+background: pink;`)
+
+setTimeout(() => {
+	var c = document.querySelector(".c");
+	var ctx = c.getContext("2d");
+	requestAnimationFrame(() => draw(ctx))
+}, 100)
+
+function draw(ctx) {
+	ctx.globalCompositeOperation = "destination-over"; ctx.clearRect(0, 0, 300, 300);
+	ctx.moveTo(0, 0)
+	ctx.lineTo(M.location.x, M.location.y);
+	ctx.stroke();
+	requestAnimationFrame(() => draw(ctx))
+}
+
+
 
 render(() => html`
-  div [ class = widget style=${style}]`,
-	document.body)
+div [style=${style}]
+div [style=${style2}]
+  canvas.c [width=300 height=300 ]
+
+`, document.body)

@@ -49,7 +49,7 @@ let app = () => {
 function any_widget(element, index) {
 	if (element.type == "default") return assign_and_render(element, index, code_element)
 	if (element.type == "number_variable_widget") return assign_and_render(element, index, number_variable_widget)
-	if (element.type == "vect") return assign_and_render(element, index, widget)
+	if (element.type == "vect") return assign_and_render(element, index, vector)
 }
 
 function assign_and_render(elem, index, fn) {
@@ -60,18 +60,25 @@ function assign_and_render(elem, index, fn) {
 	return c.render
 }
 
+function pipe_model(signal, key) {
+	eff_on(signal, () => m() ? m()["function" == typeof key ? key() : key] = signal() : null)
+}
+
+function register_model(key, signal) {
+	let s = sig(signal)
+	pipe_model(s, key)
+	return s
+}
+
+
 function number_variable_widget(element) {
-	let num = sig(element.num ? element.num : 0)
 	let name = sig(element.name ? element.name : "variable")
+	let num = register_model(name, element.num ? element.num : 0)
 	let save = (el) => {
 		el.num = num()
 		el.name = name()
 		el.code = `M.${name()} = ${num()}`
 	}
-
-	eff_on(num, () => {
-		m() ? m()[name()] = num() : null
-	})
 
 	let r = () => html`
 		style ---
@@ -131,6 +138,7 @@ function number_variable_widget(element) {
 
 	})
 }
+
 
 function code_element(element) {
 	const recursive_fucking_children = (doc) => {
@@ -219,38 +227,29 @@ function code_element(element) {
 }
 
 
-function widget(element) {
-	let { x, y } = element
-	x = x ? x : 0
-	y = y ? y : 0
+function vector(e) {
+	let x = e.x || 0, y = e.y || 0
 
-	let vect = sig({ x, y })
+	let name = sig(e.name || "vect")
+	let size = sig(e.size || 100)
+	let vect = register_model(name, { x, y })
+	let recording = sig(true)
 
-	let onmousemove = (e) => vect.set({ x: e.layerX, y: e.layerY })
-	eff_on(vect, () => {
-		if (m()) {
-			m()["vect_x"] = vect().x
-			m()["vect_y"] = vect().y
-			console.log("setting vect", m()["vect_x"], m()["vect_y"])
-		}
-	})
+	let onmousemove = (e) => recording() ? vect.set({ x: e.layerX, y: e.layerY }) : null
 
-	let style = "position: absolute; top: 0; left: 0; width: 100px; height: 100px; background: red;"
+	let style = mem(() => `position: absolute; top: 40px; left: 0; width: ${size()}px; height: ${size()}px; background: ${recording() ? "red" : "#ccc"};`)
+	let code = mem(() => `M.${name()} = { x: ${vect().x}, y: ${vect().y} }`)
 
 	return {
 		render: () => html`
-			div [style=width:100%;height:130px;position:relative;]
-				div [ class = widget style=${style} onmousemove=${onmousemove} ]
-					p -- x: ${() => vect().x}
-					p -- y: ${() => vect().y}
-					p -- ${() => element.code}
-			`,
+			div [style=${mem(() => `width:100%;position:relative;height:${size() + 60}px;`)}]
+				input [ type=text value=${name} oninput=${(e) => name.set(e.target.value)} ]
+				input [ type=range value=${size} oninput=${(e) => size.set(parseFloat(e.target.value))} min=0 max=500 step=1]
+				div [ class = widget style=${style} onmousemove=${onmousemove} onclick=${() => recording.set(!recording())} ]
+					p -- ${code}`,
 		onselect: () => { },
 		onediting: () => { },
-		onenter: (el) => el.code = `
-			M.vect_x = ${vect().x};
-			M.vect_y = ${vect().y}
-		`
+		onenter: (el) => { el.code = code(); el.name = name() }
 	}
 }
 
