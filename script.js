@@ -7,8 +7,12 @@ import {
 import { batch, createStore } from "./solid_monke/mini-solid.js";
 
 let [model, set_model] = createStore({
-	code_list: [{ type: "default", code: "" }]
+	code_list: [{ type: "default", code: "" }],
+	renderers: {}
 })
+
+let register_renderer = (type, render) => set_model("renderers", type, render)
+let get_renderer = (type) => model.renderers[type]
 
 
 //* Code element
@@ -34,7 +38,7 @@ let template_end = `</script>`
 let m = () => document.querySelector("iframe")?.contentDocument.M
 
 let compiled = mem(() => {
-	let code = model.code_list.map(code => code.code).join("\n")
+	let code = model.code_list.map(block => block.output).join("\n")
 	return template_start + code + template_end
 })
 
@@ -47,17 +51,21 @@ let app = () => {
 
 
 function any_widget(element, index) {
-	if (element.type == "default") return assign_and_render(element, index, code_element)
-	if (element.type == "number_variable_widget") return assign_and_render(element, index, number_variable_widget)
-	if (element.type == "vect") return assign_and_render(element, index, vector)
+	let render = model.renderers[element.type]
+	console.log("rendering", render)
+	if (typeof render == "function") {
+		console.log("rendering", element)
+		if (!element) return
+		let c = render(element)
+		set_model("code_list", index(), produce((el) => {
+			el.onenter = c.onenter
+		}))
+		return c.render
+	}
+
 }
 
 function assign_and_render(elem, index, fn) {
-	let c = fn(elem)
-	set_model("code_list", index(), produce((el) => {
-		el.onenter = c.onenter
-	}))
-	return c.render
 }
 
 function pipe_model(signal, key) {
@@ -72,12 +80,12 @@ function register_model(key, signal) {
 
 
 function number_variable_widget(element) {
-	let name = sig(element.name ? element.name : "variable")
-	let num = register_model(name, element.num ? element.num : 0)
+	let name = sig(element?.name ? element?.name : "variable")
+	let num = register_model(name, element?.num ? element?.num : 0)
 	let save = (el) => {
 		el.num = num()
 		el.name = name()
-		el.code = `M.${name()} = ${num()}`
+		el.output = `M.${name()} = ${num()}`
 	}
 
 	let r = () => html`
@@ -86,7 +94,7 @@ function number_variable_widget(element) {
 		.number-widget {
 			padding: .5em;
 			font-family: monospace;
-			height: min-content;
+			height: min-output;
 			box-shadow: none;
 		  
 		  display: grid;
@@ -128,7 +136,7 @@ function number_variable_widget(element) {
 				input [ type = range oninput=${(e) => num.set(e.target.value)} value=${num} min=0 max=255 step=1]
 
 				button [ onclick = ${() => { trigger_save() }}] -- set
-			p.out -- ${() => element.code}
+			p.out -- ${() => element.output}
 `
 	return ({
 		render: r,
@@ -153,7 +161,8 @@ function code_element(element) {
 
 		return text;
 	};
-	let memo_code = mem(() => element.code ? element.code : "")
+
+	let memo_code = mem(() => element?.output ? element?.output : "")
 	let uid = Math.random().toString(36).substring(7)
 	let save
 	let write_enabled = sig(true)
@@ -161,7 +170,6 @@ function code_element(element) {
 	return ({
 		render: () => {
 			mounted(() => {
-				console.log("mounting editor")
 				let readonly = new Compartment()
 
 				let editor = new EditorView({
@@ -196,7 +204,6 @@ function code_element(element) {
 									},
 									preventDefault: true,
 								}
-
 							])
 						]
 					})
@@ -205,7 +212,7 @@ function code_element(element) {
 				save = function(el) {
 					element.focused = editor.hasFocus
 					let text = recursive_fucking_children(editor.state.doc).join("\n");
-					el.code = text
+					el.output = text
 					// set_code(index(), text)
 					element.cursor = editor.state.selection.ranges[0].from
 				}
@@ -228,10 +235,10 @@ function code_element(element) {
 
 
 function vector(e) {
-	let x = e.x || 0, y = e.y || 0
+	let x = e?.x || 0, y = e?.y || 0
 
-	let name = sig(e.name || "vect")
-	let size = sig(e.size || 100)
+	let name = sig(e?.name || "vect")
+	let size = sig(e?.size || 100)
 	let vect = register_model(name, { x, y })
 	let recording = sig(true)
 
@@ -249,9 +256,26 @@ function vector(e) {
 					p -- ${code}`,
 		onselect: () => { },
 		onediting: () => { },
-		onenter: (el) => { el.code = code(); el.name = name() }
+		onenter: (el) => { el.output = code(); el.name = name() }
 	}
 }
+
+function group_widget(element) {
+
+	return {
+		render: () => h("div.editor", each(() => element.children, (e, i) => any_widget(e, i))),
+		onselect: () => { },
+		onediting: () => { },
+		onenter: (el) => {
+			el.children.forEach((child, i) => {
+				child.onenter(child)
+			})
+
+			el.output = el.children.map((child) => child.output).join("\n")
+		}
+	}
+}
+
 
 function eval_code(code) {
 	return eval(`"use strict";(${code})`);
@@ -264,6 +288,13 @@ function trigger_save() {
 		save_queue.forEach((code, i) => set_model("code_list", i, produce((el) => code(el))))
 	})
 }
+
+register_renderer("default", () => code_element)
+register_renderer("number_variable_widget", () => number_variable_widget)
+register_renderer("vect", () => vector)
+
+console.log("model", model.renderers)
+
 
 render(app, document.body);
 
