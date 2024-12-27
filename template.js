@@ -93,3 +93,18 @@ render(() => html`
   p [ style=${color_mem(255, 0)}] -- ${x}, ${() => model.y}, ${() => model.z}, ${() => model.a}
  `,
 	document.body)
+
+/// --------------------
+
+
+let style = mem(() =>
+	`position: absolute;
+top: ${M.vect_y}px;
+left: ${M.vect_x}px;
+width: 100px;
+height: 100px;
+background: red;`)
+
+render(() => html`
+  div [ class = widget style=${style}]`,
+	document.body)
