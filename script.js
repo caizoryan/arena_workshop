@@ -10,7 +10,7 @@ import { batch, createStore } from "./solid_monke/mini-solid.js";
 let [model, set_model] = createStore({
 	blocks: [
 		{ type: "group", output: "", children: [{ type: "default", output: `console.log("helloworld")` },], active: false },
-		{ type: "group", output: "", children: [{ type: "number_variable_widget", output: "", num: 0, name: "variable" },], active: false },
+		{ type: "group", output: "", children: [{ type: "number_variable_widget", output: "M.ass = 14", num: 14, name: "ass" },], active: false },
 	],
 	renderers: {},
 	cursor: 0,
@@ -39,6 +39,21 @@ eff_on(() => model.cursor, () => {
 	})
 })
 
+/**
+ * @typedef {Object} Renderer
+ *
+ * @property {(el) => void} write
+ * @property {() => any[] | any} render
+ *
+ * @property {() => void} [onselect]
+ * @property {() => void} [onfocus]
+ * @property {() => void} [onunfocus]
+ */
+
+/**
+ * @param {string}  type - type of renderer to be used in process gen.
+ * @param {() => ()=> Renderer} render - to be passed a function that returns the renderer 
+ */
 let register_renderer = (type, render) => set_model("renderers", type, render)
 
 
@@ -55,7 +70,7 @@ let template_start = `
 <body></body>
 <script type="module">
 
-import { mem, render, mut, sig, html, eff, eff_on} from "./solid_monke/solid_monke.js";
+import { mem, render, mut, sig, html, eff, eff_on, h} from "./solid_monke/solid_monke.js";
 
 let M = mut({})
 document.M = M
@@ -84,7 +99,7 @@ function any_widget(element, index) {
 		let c = render(element, index)
 		set_model("blocks", index(), produce((el) => {
 			el.onkeydown = c.onkeydown
-			el.onenter = c.onenter
+			el.write = c.write
 		}))
 
 		return h("div", { style: mem(() => element.active ? "border: 1px solid red;" : null), onmousedown: (e) => model.set_cursor(index()) }, c.render)
@@ -165,7 +180,7 @@ function number_variable_widget(element) {
 		render: r,
 		onselect: () => { },
 		onediting: () => { },
-		onenter: save
+		write: save
 
 	})
 }
@@ -252,7 +267,7 @@ function code_element(element) {
 		},
 		onselect: () => { },
 		onediting: () => { },
-		onenter: (...args) => save(...args)
+		write: (...args) => save(...args)
 	})
 }
 
@@ -279,13 +294,13 @@ function vector(e) {
 					p -- ${code}`,
 		onselect: () => { },
 		onediting: () => { },
-		onenter: (el) => { el.output = code(); el.name = name() }
+		write: (el) => { el.output = code(); el.name = name() }
 	}
 }
 
 function group_widget(element, i) {
 	function save_m(el) {
-		el.children.forEach((child, i) => { child.onenter(child) })
+		el.children.forEach((child, i) => { child.write(child) })
 		el.output = el.children.map((child) => child.output).join("\n")
 	}
 
@@ -296,7 +311,7 @@ function group_widget(element, i) {
 			let c = render(element, index)
 
 			set_model("blocks", i(), produce((el) => {
-				el.children[index()].onenter = c.onenter
+				el.children[index()].write = c.write
 			}))
 
 			return c.render
@@ -329,7 +344,7 @@ function group_widget(element, i) {
 		onselect: () => { },
 		onediting: () => { },
 		onkeydown,
-		onenter: save_m
+		write: save_m
 	}
 }
 
@@ -339,7 +354,7 @@ function eval_code(code) {
 }
 
 function trigger_save() {
-	let save_queue = model.blocks.map((code) => code.onenter)
+	let save_queue = model.blocks.map((code) => code.write)
 	batch(() => {
 		save_queue.forEach((code, i) =>
 			"function" == typeof code ? set_model("blocks", i, produce((el) => code(el))) : null)
@@ -360,6 +375,10 @@ window.onload = () => {
 		if (e.key == "ArrowDown") { model.cursor_next() }
 		if (e.key == "ArrowUp") { model.cursor_prev() }
 		if (e.key == "Enter" && e.altKey) { trigger_save() }
+		// if (e.key == "r" && e.ctrlKey) {
+		// 	let iframe = document.querySelector("iframe")
+		// 	iframe.srcdoc = compiled()
+		// }
 
 		let active = find_active()
 		if (active.onkeydown) { active.onkeydown(e); return }
