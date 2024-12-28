@@ -1,4 +1,4 @@
-import { render, html, mem, mut, eff_on, mounted, sig, h, For, each, store, produce } from "./solid_monke/solid_monke.js";
+import { render, html, mem, mut, eff_on, mounted, sig, h, For, each, store, produce, when, eff } from "./solid_monke/solid_monke.js";
 import {
 	EditorState, EditorView, basicSetup, javascript, keymap,
 	esLint, lintGutter, linter, openLintPanel, Linter, Compartment
@@ -6,13 +6,40 @@ import {
 } from "./codemirror/bundled.js"
 import { batch, createStore } from "./solid_monke/mini-solid.js";
 
+
 let [model, set_model] = createStore({
-	code_list: [{ type: "default", code: "" }],
-	renderers: {}
+	blocks: [
+		{ type: "group", output: "", children: [{ type: "default", output: `console.log("helloworld")` },], active: false },
+		{ type: "group", output: "", children: [{ type: "number_variable_widget", output: "", num: 0, name: "variable" },], active: false },
+	],
+	renderers: {},
+	cursor: 0,
+
+	set_cursor: (index) => set_model("cursor", index),
+
+	cursor_next: () => {
+		if (model.cursor < model.blocks.length - 1) { model.set_cursor(model.cursor + 1) }
+		else { model.set_cursor(0) }
+	},
+
+	cursor_prev: () => {
+		if (model.cursor > 0) { model.set_cursor(model.cursor - 1) }
+		else { model.set_cursor(model.blocks.length - 1) }
+	},
+})
+
+let find_active = () => model.blocks.find((el) => el.active)
+
+
+
+eff_on(() => model.cursor, () => {
+	batch(() => {
+		set_model("blocks", [0, model.blocks.length - 1], produce((el) => el.active = false))
+		set_model("blocks", model.cursor, produce((el) => el.active = true))
+	})
 })
 
 let register_renderer = (type, render) => set_model("renderers", type, render)
-let get_renderer = (type) => model.renderers[type]
 
 
 //* Code element
@@ -38,13 +65,13 @@ let template_end = `</script>`
 let m = () => document.querySelector("iframe")?.contentDocument.M
 
 let compiled = mem(() => {
-	let code = model.code_list.map(block => block.output).join("\n")
+	let code = model.blocks.map(block => block.output).join("\n")
 	return template_start + code + template_end
 })
 
 let app = () => {
 	return h("div.container", [
-		h("div.editor", each(model.code_list, (e, i) => any_widget(e, i))),
+		h("div.editor", each(model.blocks, (e, i) => any_widget(e, i))),
 		h("iframe", { srcdoc: compiled, width: "98%", height: "98%" })
 	])
 }
@@ -52,20 +79,16 @@ let app = () => {
 
 function any_widget(element, index) {
 	let render = model.renderers[element.type]
-	console.log("rendering", render)
+
 	if (typeof render == "function") {
-		console.log("rendering", element)
-		if (!element) return
-		let c = render(element)
-		set_model("code_list", index(), produce((el) => {
+		let c = render(element, index)
+		set_model("blocks", index(), produce((el) => {
+			el.onkeydown = c.onkeydown
 			el.onenter = c.onenter
 		}))
-		return c.render
+
+		return h("div", { style: mem(() => element.active ? "border: 1px solid red;" : null), onmousedown: (e) => model.set_cursor(index()) }, c.render)
 	}
-
-}
-
-function assign_and_render(elem, index, fn) {
 }
 
 function pipe_model(signal, key) {
@@ -260,51 +283,34 @@ function vector(e) {
 	}
 }
 
-function group_widget(element) {
+function group_widget(element, i) {
+	function save_m(el) {
+		el.children.forEach((child, i) => { child.onenter(child) })
+		el.output = el.children.map((child) => child.output).join("\n")
+	}
 
-	return {
-		render: () => h("div.editor", each(() => element.children, (e, i) => any_widget(e, i))),
-		onselect: () => { },
-		onediting: () => { },
-		onenter: (el) => {
-			el.children.forEach((child, i) => {
-				child.onenter(child)
-			})
+	let child_widget = (element, index) => {
+		let render = model.renderers[element.type]
 
-			el.output = el.children.map((child) => child.output).join("\n")
+		if (typeof render == "function") {
+			let c = render(element, index)
+
+			set_model("blocks", i(), produce((el) => {
+				el.children[index()].onenter = c.onenter
+			}))
+
+			return c.render
 		}
 	}
-}
 
+	let add_widget = (type) => {
+		trigger_save()
+		set_model("blocks", i(), produce((g) => {
+			g.children.push({ type, code: "" })
+		}))
+	}
 
-function eval_code(code) {
-	return eval(`"use strict";(${code})`);
-}
-
-function trigger_save() {
-	let save_queue = model.code_list.map((code) => code.onenter)
-	console.log("save_queue", save_queue)
-	batch(() => {
-		save_queue.forEach((code, i) => set_model("code_list", i, produce((el) => code(el))))
-	})
-}
-
-register_renderer("default", () => code_element)
-register_renderer("number_variable_widget", () => number_variable_widget)
-register_renderer("vect", () => vector)
-
-console.log("model", model.renderers)
-
-
-render(app, document.body);
-
-function add_widget(type) {
-	trigger_save()
-	set_model("code_list", model.code_list.length, { type: type, code: "" })
-}
-
-window.onload = () => {
-	window.onkeydown = (e) => {
+	let onkeydown = (e) => {
 		if (e.key == "t" && e.ctrlKey) {
 			add_widget("default")
 		}
@@ -316,11 +322,47 @@ window.onload = () => {
 		if (e.key == "k" && e.ctrlKey) {
 			add_widget("vect")
 		}
+	}
 
-		if (e.key == "Enter" && e.altKey) {
-			console.log("trigger save")
-			trigger_save()
-		}
+	return {
+		render: () => h("div.editor", each(() => element.children, (e, i) => child_widget(e, i))),
+		onselect: () => { },
+		onediting: () => { },
+		onkeydown,
+		onenter: save_m
+	}
+}
+
+
+function eval_code(code) {
+	return eval(`"use strict";(${code})`);
+}
+
+function trigger_save() {
+	let save_queue = model.blocks.map((code) => code.onenter)
+	batch(() => {
+		save_queue.forEach((code, i) =>
+			"function" == typeof code ? set_model("blocks", i, produce((el) => code(el))) : null)
+	})
+}
+
+register_renderer("default", () => code_element)
+register_renderer("number_variable_widget", () => number_variable_widget)
+register_renderer("vect", () => vector)
+register_renderer("group", () => group_widget)
+
+
+render(app, document.body);
+
+window.onload = () => {
+	window.onkeydown = (e) => {
+
+		if (e.key == "ArrowDown") { model.cursor_next() }
+		if (e.key == "ArrowUp") { model.cursor_prev() }
+		if (e.key == "Enter" && e.altKey) { trigger_save() }
+
+		let active = find_active()
+		if (active.onkeydown) { active.onkeydown(e); return }
 
 	}
 }
