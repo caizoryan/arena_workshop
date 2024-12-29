@@ -10,25 +10,24 @@ import { batch, createStore } from "./solid_monke/mini-solid.js";
 let [model, set_model] = createStore({
 	blocks: [
 		{ type: "group", output: "", children: [{ type: "default", output: `console.log("helloworld")` },], active: false },
-		{ type: "group", output: "", children: [{ type: "number_variable_widget", output: "M.ass = 14", num: 14, name: "ass" },], active: false },
+		{ type: "group", output: "", children: [{ type: "number", output: "M.ass = 14", num: 14, name: "ass" },], active: false },
 	],
 	renderers: {},
-	cursor: 0,
-
-	set_cursor: (index) => set_model("cursor", index),
-
-	cursor_next: () => {
-		if (model.cursor < model.blocks.length - 1) { model.set_cursor(model.cursor + 1) }
-		else { model.set_cursor(0) }
-	},
-
-	cursor_prev: () => {
-		if (model.cursor > 0) { model.set_cursor(model.cursor - 1) }
-		else { model.set_cursor(model.blocks.length - 1) }
-	},
-})
+	cursor: 0
+}, {})
 
 let find_active = () => model.blocks.find((el) => el.active)
+let set_cursor = (index) => set_model("cursor", index)
+
+let cursor_next = () => {
+	if (model.cursor < model.blocks.length - 1) { set_cursor(model.cursor + 1) }
+	else { set_cursor(0) }
+}
+
+let cursor_prev = () => {
+	if (model.cursor > 0) { set_cursor(model.cursor - 1) }
+	else { set_cursor(model.blocks.length - 1) }
+}
 
 
 
@@ -46,16 +45,33 @@ eff_on(() => model.cursor, () => {
  * @property {() => any[] | any} render
  *
  * @property {() => void} [onselect]
+ * @property {() => void} [onkeydown]
  * @property {() => void} [onfocus]
  * @property {() => void} [onunfocus]
  */
 
 /**
  * @param {string}  type - type of renderer to be used in process gen.
- * @param {() => ()=> Renderer} render - to be passed a function that returns the renderer 
+ * @param {string} renderer - passed as string, to be evaluated at runtime 
  */
-let register_renderer = (type, render) => set_model("renderers", type, render)
+let register_renderer = (type, renderer) => set_model("renderers", type, renderer)
 
+function eval_code(code) {
+	return eval(`"use strict";(${code})`);
+}
+
+/** returns a renderer function
+* @param {string} str - code to be evaluated
+* @returns {(a: any, b:any ) => Renderer}
+*/
+function return_renderer(str) {
+	let fn = eval_code(str)
+	if (typeof fn == "function") {
+		return fn
+	} else {
+		throw new Error("Invalid renderer")
+	}
+}
 
 //* Code element
 // implements
@@ -93,16 +109,20 @@ let app = () => {
 
 
 function any_widget(element, index) {
-	let render = model.renderers[element.type]
+	let render_str = model.renderers[element.type]
+	let render = return_renderer(render_str)
+
 
 	if (typeof render == "function") {
 		let c = render(element, index)
+		console.log(c)
+
 		set_model("blocks", index(), produce((el) => {
 			el.onkeydown = c.onkeydown
 			el.write = c.write
 		}))
 
-		return h("div", { style: mem(() => element.active ? "border: 1px solid red;" : null), onmousedown: (e) => model.set_cursor(index()) }, c.render)
+		return h("div", { style: mem(() => element.active ? "border: 1px solid red;" : null), onmousedown: (e) => set_cursor(index()) }, c.render)
 	}
 }
 
@@ -117,7 +137,7 @@ function register_model(key, signal) {
 }
 
 
-function number_variable_widget(element) {
+function number_widget(element) {
 	let name = sig(element?.name ? element?.name : "variable")
 	let num = register_model(name, element?.num ? element?.num : 0)
 	let save = (el) => {
@@ -164,7 +184,9 @@ function number_variable_widget(element) {
 		}
 
 		---
-		.number-widget
+		.number-widget [onclick=${() => {
+			console.log(model.renderers[element.type])
+		}}]
 			.values
 				span -- M.
 				input [ type=text oninput = ${(e) => { name.set(e.target.value); console.log(e.target.value, name()); }} value=${element.name} ]
@@ -176,6 +198,17 @@ function number_variable_widget(element) {
 				button [ onclick = ${() => { trigger_save() }}] -- set
 			p.out -- ${() => element.output}
 `
+	return ({
+		render: r,
+		onselect: () => { },
+		onediting: () => { },
+		write: save
+
+	})
+}
+
+function render_editor(element) {
+
 	return ({
 		render: r,
 		onselect: () => { },
@@ -222,6 +255,12 @@ function code_element(element) {
 							lintGutter(),
 
 							keymap.of([
+								{
+									key: "Ctrl-y", run: () => {
+										let text = recursive_fucking_children(editor.state.doc).join("\n");
+										register_renderer("ass", text)
+									}
+								},
 								{
 									key: "Escape", run: () => {
 										write_enabled.set(false)
@@ -283,7 +322,7 @@ function vector(e) {
 	let onmousemove = (e) => recording() ? vect.set({ x: e.layerX, y: e.layerY }) : null
 
 	let style = mem(() => `position: absolute; top: 40px; left: 0; width: ${size()}px; height: ${size()}px; background: ${recording() ? "red" : "#ccc"};`)
-	let code = mem(() => `M.${name()} = { x: ${vect().x}, y: ${vect().y} }`)
+	let code = mem(() => `M["${name()}"] = { x: ${vect().x}, y: ${vect().y} }`)
 
 	return {
 		render: () => html`
@@ -299,13 +338,20 @@ function vector(e) {
 }
 
 function group_widget(element, i) {
+	console.log(element)
+	// let trash = []
+	// let cursor = sig(0)
+	// let cursor_next = () => element.children.length > cursor() + 1 ? cursor.set(cursor() + 1) : null
+	// let cursor_prev = () => cursor() > 0 ? cursor.set(cursor() - 1) : null
+
 	function save_m(el) {
 		el.children.forEach((child, i) => { child.write(child) })
 		el.output = el.children.map((child) => child.output).join("\n")
 	}
 
 	let child_widget = (element, index) => {
-		let render = model.renderers[element.type]
+		let render_str = model.renderers[element.type]
+		let render = return_renderer(render_str)
 
 		if (typeof render == "function") {
 			let c = render(element, index)
@@ -331,7 +377,7 @@ function group_widget(element, i) {
 		}
 
 		if (e.key == "n" && e.ctrlKey) {
-			add_widget("number_variable_widget")
+			add_widget("number")
 		}
 
 		if (e.key == "k" && e.ctrlKey) {
@@ -343,43 +389,48 @@ function group_widget(element, i) {
 		render: () => h("div.editor", each(() => element.children, (e, i) => child_widget(e, i))),
 		onselect: () => { },
 		onediting: () => { },
+		onfocus: () => { },
 		onkeydown,
 		write: save_m
 	}
 }
 
 
-function eval_code(code) {
-	return eval(`"use strict";(${code})`);
-}
 
 function trigger_save() {
 	let save_queue = model.blocks.map((code) => code.write)
-	batch(() => {
+	batch(() =>
 		save_queue.forEach((code, i) =>
-			"function" == typeof code ? set_model("blocks", i, produce((el) => code(el))) : null)
-	})
+			"function" == typeof code
+				? set_model("blocks", i, produce((el) => code(el)))
+				: null)
+	)
 }
 
-register_renderer("default", () => code_element)
-register_renderer("number_variable_widget", () => number_variable_widget)
-register_renderer("vect", () => vector)
-register_renderer("group", () => group_widget)
+register_renderer("group", group_widget.toString())
+register_renderer("default", code_element.toString())
+register_renderer("number", number_widget.toString())
 
 
+let v = vector.toString()
+
+register_renderer("vect", v)
 render(app, document.body);
 
 window.onload = () => {
 	window.onkeydown = (e) => {
-
-		if (e.key == "ArrowDown") { model.cursor_next() }
-		if (e.key == "ArrowUp") { model.cursor_prev() }
+		// happens no matter what
 		if (e.key == "Enter" && e.altKey) { trigger_save() }
-		// if (e.key == "r" && e.ctrlKey) {
-		// 	let iframe = document.querySelector("iframe")
-		// 	iframe.srcdoc = compiled()
-		// }
 
+		// if no elment is in focus
+		if (e.target == document.body) {
+			if (e.key == "ArrowDown") { cursor_next() }
+			if (e.key == "ArrowUp") { cursor_prev() }
+		}
+
+
+		// if there is an element active,
+		// forward the event to it
 		let active = find_active()
 		if (active.onkeydown) { active.onkeydown(e); return }
 
