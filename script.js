@@ -7,10 +7,13 @@ import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGu
 
 let [model, set_model] = createStore({
 	blocks: [
+		{
+			type: "group", output: "", blocks: [
+				{ type: "number", output: "M.ass = 14", num: 14, name: "ass" },
+				{ type: "default", output: "" }
+			], active: false, focus: false
+		},
 		{ type: "group", output: "", blocks: [{ type: "number", output: "M.ass = 14", num: 14, name: "ass" },], active: false, focus: false },
-		{ type: "group", output: "", blocks: [{ type: "default", output: `console.log("helloworld")` },], active: false, focus: false },
-		{ type: "group", output: "", blocks: [{ type: "default", output: `console.log("helloworld")` },], active: false, focus: false },
-		{ type: "group", output: "", blocks: [{ type: "default", output: `console.log("helloworld")` },], active: false, focus: false },
 	],
 	renderers: {},
 	cursor: 0
@@ -140,15 +143,19 @@ function trigger_save() {
 
 function group_widget(element, i) {
 	let trash = []
+
+	let [miniStore, setMiniStore] = createStore({
+		blocks: [...element.blocks],
+	})
+
 	let cursor = sig(-1)
-	let cursor_next = () => element.blocks.length > cursor() + 1 ? cursor.set(cursor() + 1) : null
+	let cursor_next = () => miniStore.blocks.length > cursor() + 1 ? cursor.set(cursor() + 1) : null
 	let cursor_prev = () => cursor() > 0 ? cursor.set(cursor() - 1) : null
 
 	eff_on(cursor, () => {
-		console.log("cursor", cursor())
 		batch(() => {
-			set_model("blocks", i(), produce((el) => {
-				el.blocks.forEach((e, ii) => {
+			setMiniStore("blocks", produce((el) => {
+				el.forEach((e, ii) => {
 					if (ii === cursor()) {
 						e.active = true
 					} else {
@@ -160,15 +167,24 @@ function group_widget(element, i) {
 	})
 
 	function save_m(el) {
-		el.blocks.forEach((child, i) => { child.write(child) })
-		el.output = el.blocks.map((child) => child.output).join("\n")
+		let save_queue = miniStore.blocks.map((code) => code.write)
+		batch(() =>
+			save_queue.forEach((code, i) =>
+				"function" == typeof code
+					? setMiniStore("blocks", i, produce((el) => code(el)))
+					: null)
+		)
+
+		let output = miniStore.blocks.map((child) => child.output).join("\n")
+		el.output = output
+		el.blocks = miniStore.blocks
 	}
 
 	let add_widget = (type, state) => {
 		trigger_save()
-		set_model("blocks", i(), produce((g) => {
-			if (state) g.blocks.push({ type, ...state })
-			else g.blocks.push({ type, code: "" })
+		setMiniStore("blocks", produce((g) => {
+			if (state) g.push({ type, ...state })
+			else g.push({ type, code: "" })
 		}))
 	}
 
@@ -179,24 +195,21 @@ function group_widget(element, i) {
 	}
 
 	let child_widget = (rel, index) => {
+		if (!rel?.type) return
 		let render_str = model.renderers[rel.type]
 		let render = return_renderer(render_str)
 
 		if (typeof render == "function") {
 			let c = render(rel, index, controller)
-			set_model("blocks", i(), produce((el) => el.blocks[index()].write = c.write))
 
-			let border = sig("border: 1px solid black")
+			setMiniStore("blocks", index(), produce((el) => {
+				el.write = c.write
+				el.onfocus = c.onfocus
+			}))
 
-			eff_on(() => rel.active, () => {
-				console.log("rel.active", rel.active, rel.name)
-				if (rel.active) border.set("border: 1px solid red")
-				else border.set("border: 1px solid black")
-			})
+			let style = mem(() => `border: ${rel.active ? "1px solid red" : null}`)
 
-			let style = mem(() => `border: ${border()}`)
-
-			return () => h("div", { style: border, onmousedown: (e) => cursor.set(index) }, c.render)
+			return () => h("div", { style: style, onmousedown: (e) => cursor.set(index) }, c.render)
 		}
 	}
 
@@ -204,9 +217,17 @@ function group_widget(element, i) {
 		if (e.key == "ArrowDown") { cursor_next() }
 		if (e.key == "ArrowUp") { cursor_prev() }
 
+		if (e.key == "Enter") {
+			setMiniStore("blocks", cursor(), produce((el) => el.focus = true))
+			let fn = miniStore.blocks[cursor()]?.onfocus
+			if (fn && "function" == typeof fn) fn()
+		}
+
 		if (e.key == "Escape") {
 			set_model("blocks", i(), produce((el) => el.focus = false))
 		}
+
+
 		if (e.key == "t" && e.ctrlKey) {
 			add_widget("default")
 		}
@@ -221,12 +242,12 @@ function group_widget(element, i) {
 	}
 
 	return {
-		render: () => h("div.editor", each(() => element.blocks, (e, i) => child_widget(e, i))),
+		render: () => h("div.editor", each(() => miniStore.blocks, (e, i) => child_widget(e, i))),
 		onselect: () => { },
 		onediting: () => { },
 		onfocus: () => { },
 		onkeydown,
-		write: save_m
+		write: (el) => save_m(el)
 	}
 }
 
@@ -252,8 +273,11 @@ function register_model(key, signal) {
 window.onload = () => {
 	window.onkeydown = (e) => {
 		// happens no matter what
-		if (e.key == "Enter" && e.altkey) { trigger_save() }
+		if (e.key == "Enter" && e.altkey) {
+			trigger_save()
+		}
 		else if (e.key == "Enter") {
+			trigger_save()
 			set_model("blocks", model.cursor, "focus", true)
 		}
 

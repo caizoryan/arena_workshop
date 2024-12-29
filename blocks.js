@@ -1,9 +1,5 @@
+import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment } from "./codemirror/bundled.js"
 import { html, mem, mounted, sig, } from "./solid_monke/solid_monke.js";
-import {
-	EditorState, EditorView, basicSetup, javascript, keymap,
-	esLint, lintGutter, linter, Linter, Compartment
-} from "./codemirror/bundled.js"
-
 export function number_widget(element, i, controller) {
 	let name = sig(element?.name ? element?.name : "variable")
 	let num = register_model(name, element?.num ? element?.num : 0)
@@ -119,7 +115,7 @@ export function code_element(element) {
 
 	let memo_code = mem(() => element?.output ? element?.output : "")
 	let uid = Math.random().toString(36).substring(7)
-	let save
+	let save, focus
 	let write_enabled = sig(true)
 
 	return ({
@@ -151,6 +147,8 @@ export function code_element(element) {
 										editor.dispatch({
 											effects: readonly.reconfigure(EditorState.readOnly.of(!write_enabled()))
 										})
+										editor.contentDOM.blur()
+										window.getSelection()?.removeAllRanges();
 									},
 
 								},
@@ -170,6 +168,10 @@ export function code_element(element) {
 					})
 				})
 
+				focus = function() {
+					editor.focus()
+				}
+
 				save = function(el) {
 					element.focused = editor.hasFocus
 					let text = recursive_fucking_children(editor.state.doc).join("\n");
@@ -188,6 +190,7 @@ export function code_element(element) {
 			})
 			return html`div [ class = ${"editor-" + uid} style=${mem(() => `opacity: ${write_enabled() ? 1 : .5}`)} ]`
 		},
+		onfocus: () => { console.log("whore"); focus() },
 		onselect: () => { },
 		onediting: () => { },
 		write: (...args) => save(...args)
