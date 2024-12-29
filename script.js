@@ -309,12 +309,8 @@ function register_model(key, signal) {
 window.onload = () => {
 	window.onkeydown = (e) => {
 		// happens no matter what
-		if (e.key == "Enter" && e.ctrlKey) {
-			console.log("ctrl enter")
-			trigger_save()
-		}
-		if (e.key == "Enter" && e.altKey == true) {
-			console.log("alt enter")
+		if (e.key == "Enter" && e.metaKey == true) {
+			console.log("command enter")
 			trigger_save()
 		}
 
