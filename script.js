@@ -5,7 +5,8 @@ import { vector, code_element, number_widget, render_editor } from "./blocks.js"
 import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment } from "./codemirror/bundled.js"
 
 
-let [model, set_model] = createStore({
+
+let moodle = {
 	blocks: [
 		{
 			type: "group", output: "", blocks: [
@@ -17,7 +18,18 @@ let [model, set_model] = createStore({
 	],
 	renderers: {},
 	cursor: 0
-}, {})
+}
+
+let load = () => {
+	if (localStorage.getItem("model")) {
+		moodle = JSON.parse(localStorage.getItem("model"))
+	}
+}
+
+load()
+
+
+let [model, set_model] = createStore(moodle, {})
 
 let remove_block = (index) => set_model("blocks", (e) => e.filter((r, i) => i != index))
 
@@ -123,8 +135,8 @@ function any_widget(element, index) {
 		}))
 
 		let style = mem(() => `
-			border: ${element.active ? "1px solid red;" : null}
-			box-shadow: ${element.focus ? "0 0 10px 5px rgba(255, 0, 0, 0.5);" : null}
+			${element.active ? "box-shadow: 0 0 5px 5px rgba(0, 0, 0, 0.05);" : null}
+			 ${element.focus ? "box-shadow: 0 0 10px 5px rgba(0, 0, 0, 0.1);transform: scale(1.01)" : null}
 		`)
 
 		return () => h("div", { style: style, onmousedown: (e) => set_cursor(index()) }, c.render)
@@ -139,6 +151,8 @@ function trigger_save() {
 				? set_model("blocks", i, produce((el) => code(el)))
 				: null)
 	)
+
+	localStorage.setItem("model", JSON.stringify(model))
 }
 
 function group_widget(element, i) {
@@ -195,7 +209,6 @@ function group_widget(element, i) {
 	}
 
 	let child_widget = (rel, index) => {
-		if (!rel?.type) return
 		let render_str = model.renderers[rel.type]
 		let render = return_renderer(render_str)
 
@@ -207,13 +220,34 @@ function group_widget(element, i) {
 				el.onfocus = c.onfocus
 			}))
 
-			let style = mem(() => `border: ${rel.active ? "1px solid red" : null}`)
+			let style = mem(() => `
+				border: ${rel.active ? "2px solid pink;" : null}
+				box-shadow: ${rel.focus ? "0 0 25px 5px rgba(0,0,0,.1);" : null}
+				`
+			)
+
 
 			return () => h("div", { style: style, onmousedown: (e) => cursor.set(index) }, c.render)
 		}
 	}
 
+	let find_foucsed = () => miniStore.blocks.find((el) => el.focus)
+	let remove_block = (index) => setMiniStore("blocks", (e) => e.filter((r, i) => i != index))
+
 	let onkeydown = (e) => {
+		if (e.key == "Escape") {
+			console.log("esc", find_foucsed())
+			if (!find_foucsed()) {
+				set_model("blocks", i(), "focus", false)
+				cursor.set(-1)
+			}
+			setMiniStore("blocks", (el) => el.focus, "focus", false)
+		}
+
+		if (find_foucsed()) {
+			return
+		}
+
 		if (e.key == "ArrowDown") { cursor_next() }
 		if (e.key == "ArrowUp") { cursor_prev() }
 
@@ -223,9 +257,10 @@ function group_widget(element, i) {
 			if (fn && "function" == typeof fn) fn()
 		}
 
-		if (e.key == "Escape") {
-			set_model("blocks", i(), produce((el) => el.focus = false))
+		if (e.key == "Backspace" && e.ctrlKey) {
+			remove_block(cursor())
 		}
+
 
 
 		if (e.key == "t" && e.ctrlKey) {
@@ -233,6 +268,7 @@ function group_widget(element, i) {
 		}
 
 		if (e.key == "n" && e.ctrlKey) {
+			console.log("adding number")
 			add_widget("number")
 		}
 
@@ -273,16 +309,20 @@ function register_model(key, signal) {
 window.onload = () => {
 	window.onkeydown = (e) => {
 		// happens no matter what
-		if (e.key == "Enter" && e.altkey) {
+		if (e.key == "Enter" && e.ctrlKey) {
+			console.log("ctrl enter")
 			trigger_save()
 		}
-		else if (e.key == "Enter") {
+		if (e.key == "Enter" && e.altKey == true) {
+			console.log("alt enter")
 			trigger_save()
-			set_model("blocks", model.cursor, "focus", true)
 		}
 
 		// if no elment is in focus
 		if (!find_focus()) {
+			if (e.key == "Enter") {
+				set_model("blocks", model.cursor, "focus", true)
+			}
 			if (e.key == "ArrowDown") { cursor_next() }
 			if (e.key == "ArrowUp") { cursor_prev() }
 		}
