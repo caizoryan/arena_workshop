@@ -4,17 +4,15 @@ import { vector, code_element, number_widget, render_editor } from "./blocks.js"
 
 import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment } from "./codemirror/bundled.js"
 
-
-
 let moodle = {
 	blocks: [
 		{
 			type: "group", output: "", blocks: [
-				{ type: "number", output: "M.ass = 14", num: 14, name: "ass" },
-				{ type: "default", output: "" }
+				{ type: "number", output: "M.ass = 14", num: 14, name: "ass", id: "bbc" },
+				{ type: "default", output: "", id: "afrosa" }
 			], active: false, focus: false
 		},
-		{ type: "group", output: "", blocks: [{ type: "number", output: "M.ass = 14", num: 14, name: "ass" },], active: false, focus: false },
+		{ type: "group", output: "", blocks: [{ type: "number", output: "M.ass = 14", num: 14, name: "ass", id: "cool" },], active: false, focus: false },
 	],
 	renderers: {},
 	cursor: 0
@@ -155,6 +153,27 @@ function trigger_save() {
 	localStorage.setItem("model", JSON.stringify(model))
 }
 
+function find_offset_to_parent(el, parent) {
+
+	let found_parent = false
+	var curleft = 0, curtop = 0;
+
+	do {
+		console.log("top", el.offsetTop, el)
+		curleft += el.offsetLeft;
+		curtop += el.offsetTop;
+
+		el = el.offsetParent;
+
+		if (el === parent) {
+			found_parent = true
+		}
+
+	} while (!found_parent && el);
+
+	return [curleft, curtop];
+}
+
 function group_widget(element, i) {
 	let trash = []
 
@@ -172,6 +191,15 @@ function group_widget(element, i) {
 				el.forEach((e, ii) => {
 					if (ii === cursor()) {
 						e.active = true
+						let id = "block-" + e.id
+						console.log("scrolling to", id)
+						let parent = document.querySelector(".editor")
+						let el = document.getElementById(id)
+
+						let [x, y] = find_offset_to_parent(el, parent)
+
+						parent?.scrollTo({ behavior: "smooth", top: y - 100 })
+
 					} else {
 						e.active = false
 					}
@@ -196,9 +224,10 @@ function group_widget(element, i) {
 
 	let add_widget = (type, state) => {
 		trigger_save()
+		let id = Math.random().toString(36).substring(7)
 		setMiniStore("blocks", produce((g) => {
-			if (state) g.push({ type, ...state })
-			else g.push({ type, code: "" })
+			if (state) g.push({ id, type, ...state })
+			else g.push({ id, type, code: "" })
 		}))
 	}
 
@@ -227,7 +256,7 @@ function group_widget(element, i) {
 			)
 
 
-			return () => h("div", { style: style, onmousedown: (e) => cursor.set(index) }, c.render)
+			return () => h("div", { id: "block-" + rel.id, style: style, onmousedown: (e) => cursor.set(index) }, c.render)
 		}
 	}
 
@@ -278,7 +307,7 @@ function group_widget(element, i) {
 	}
 
 	return {
-		render: () => h("div.editor", each(() => miniStore.blocks, (e, i) => child_widget(e, i))),
+		render: () => h("div.group", each(() => miniStore.blocks, (e, i) => child_widget(e, i))),
 		onselect: () => { },
 		onediting: () => { },
 		onfocus: () => { },
@@ -293,7 +322,6 @@ register_renderer("default", code_element.toString())
 register_renderer("number", number_widget.toString())
 register_renderer("block_editor", render_editor.toString())
 register_renderer("vect", vector.toString())
-
 
 function pipe_model(signal, key) {
 	eff_on(signal, () => m() ? m()["function" == typeof key ? key() : key] = signal() : null)
@@ -319,8 +347,8 @@ window.onload = () => {
 			if (e.key == "Enter") {
 				set_model("blocks", model.cursor, "focus", true)
 			}
-			if (e.key == "ArrowDown") { cursor_next() }
-			if (e.key == "ArrowUp") { cursor_prev() }
+			if (e.key == "ArrowDown") { e.preventDefault(); cursor_next() }
+			if (e.key == "ArrowUp") { e.preventDefault(); cursor_prev() }
 		}
 
 		// if there is an element active,
