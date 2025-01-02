@@ -183,6 +183,7 @@ function group_widget(element, i, control) {
 		let output = miniStore.blocks.map((child) => child.output).join("\n")
 		el.output = output
 		el.blocks = miniStore.blocks
+		el.fold = fold()
 	}
 
 	let add_widget = (type, state) => {
@@ -216,6 +217,7 @@ function group_widget(element, i, control) {
 				el.onfocus = c.onfocus
 				el.onkeydown = c.onkeydown
 				el.escape = c.escape
+				el.toggle_fold = c.toggle_fold
 			}))
 
 			let style = mem(() => `
@@ -225,11 +227,22 @@ function group_widget(element, i, control) {
 			)
 
 
-			return () => h("div.child", { id: "block-" + rel.id, style: style, onmousedown: (e) => cursor.set(index) }, c.render)
+			return () => h("div.child", {
+				id: "block-" + rel.id, style: style, onmousedown: (e) => {
+
+					cursor.set(index)
+					batch(() => {
+						setMiniStore("blocks", (el) => el.focus, "focus", false)
+						setMiniStore("blocks", index, produce((el) => el.focus = true))
+					})
+
+				}
+			}, c.render)
 		}
 	}
 
 	let find_focused = () => miniStore.blocks.find((el) => el.focus)
+	let find_active = () => miniStore.blocks.find((el) => el.active)
 	let remove_block = (index) => setMiniStore("blocks", (e) => e.filter((r, i) => i != index))
 	let escape = (e) => {
 		if (e.key == "Escape") {
@@ -257,11 +270,16 @@ function group_widget(element, i, control) {
 			return
 		}
 
-		if (e.key == "f" && e.ctrlKey) {
-			toggle_fold()
-		}
 
 		if (!fold()) {
+			if (e.key == "F") {
+				let active = find_active()
+				if (active) {
+					let fn = active.toggle_fold
+					if (fn && "function" == typeof fn) fn()
+				}
+			}
+
 			if (e.key == "ArrowDown") { cursor_next() }
 			if (e.key == "ArrowUp") { cursor_prev() }
 
@@ -294,7 +312,7 @@ function group_widget(element, i, control) {
 		}
 	}
 
-	let fold = sig(false)
+	let fold = sig(element.fold || false)
 	let toggle_fold = () => fold.set(!fold())
 	let show_which = mem(() => fold()
 		? null
@@ -310,7 +328,8 @@ function group_widget(element, i, control) {
 		onfocus: () => { },
 		onkeydown,
 		escape,
-		write: (el) => save_m(el)
+		write: (el) => save_m(el),
+		toggle_fold,
 	}
 }
 
@@ -402,7 +421,7 @@ const createTheme = ({ variant, settings, styles }) => {
 export const dracula = createTheme({
 	variant: 'light',
 	settings: {
-		background: '#fcfcfc',
+		background: '#f9f9f9',
 		foreground: '#5c6166',
 		caret: '#ffaa33',
 		selection: '#036dd626',
