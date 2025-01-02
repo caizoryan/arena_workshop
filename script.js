@@ -385,11 +385,14 @@ const createTheme = ({ variant, settings, styles }) => {
 				backgroundColor: settings.background,
 				color: settings.foreground,
 			},
+			'.cm-editor.cm-focused': {
+				outline: "none",
+			},
 			'.cm-content': {
 				caretColor: settings.caret,
 			},
 			'.cm-cursor, .cm-dropCursor': {
-				borderLeftColor: settings.caret,
+				borderLeft: "2px solid" + settings.caret,
 			},
 			'&.cm-focused .cm-selectionBackgroundm .cm-selectionBackground, .cm-content ::selection':
 			{

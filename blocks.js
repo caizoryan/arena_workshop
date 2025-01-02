@@ -181,6 +181,27 @@ export function code_element(element) {
 
 
 export function make_code_mirror(code, id) {
+	let lin = new Linter()
+	const config = {
+		globals: {
+			"render": "readonly",
+			"h": "readonly",
+			"M": "readonly",
+		},
+
+		parserOptions: { ecmaVersion: 2019, sourceType: "module" },
+		env: {
+			browser: true, node: true, es6: true,
+			es2015: true, es2017: true, es2020: true
+		},
+		rules: {}
+	};
+
+	lin.getRules().forEach((desc, name2) => {
+		if (desc.meta.docs.recommended)
+			config.rules[name2] = 2;
+	});
+
 	console.log("dracula", dracula)
 	let editor = new EditorView({
 		parent: document.querySelector(".editor-" + id),
@@ -191,7 +212,7 @@ export function make_code_mirror(code, id) {
 
 				basicSetup,
 				javascript(),
-				linter(esLint(new Linter())),
+				linter(esLint(lin, config)),
 				lintGutter(),
 
 				keymap.of([
