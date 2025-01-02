@@ -86,8 +86,11 @@ let app = () => {
 function init_editor(element) {
 	if (!element) return
 	let render = return_renderer(renderers.group)
+	let control = {
+		set_self: (...args) => set_model("blocks", 0, ...args)
+	}
 
-	let c = render(element, () => 0)
+	let c = render(element, () => 0, control)
 
 	set_model("blocks", 0, produce((el) => {
 		el.onkeydown = c.onkeydown
@@ -128,12 +131,11 @@ function find_offset_to_parent(el, parent) {
 	return [curleft, curtop];
 }
 
-function group_widget(element, i) {
+function group_widget(element, i, control) {
 	let trash = []
 
-	let [miniStore, setMiniStore] = createStore({
-		blocks: [...element.blocks],
-	})
+	let blocks = element.blocks || []
+	let [miniStore, setMiniStore] = createStore({ blocks: [...blocks], })
 
 	let cursor = sig(-1)
 	let cursor_next = () => miniStore.blocks.length > cursor() + 1 ? cursor.set(cursor() + 1) : null
@@ -146,7 +148,6 @@ function group_widget(element, i) {
 					if (ii === cursor()) {
 						e.active = true
 						let id = "block-" + e.id
-						console.log("scrolling to", id)
 						let parent = document.querySelector(".editor")
 						let el = document.getElementById(id)
 
@@ -154,9 +155,7 @@ function group_widget(element, i) {
 
 						parent?.scrollTo({ behavior: "smooth", top: y - 100 })
 
-					} else {
-						e.active = false
-					}
+					} else { e.active = false }
 				})
 			}))
 		})
@@ -185,15 +184,24 @@ function group_widget(element, i) {
 		}))
 	}
 
-	let controller = {
-		add_widget: (type, props) => {
-			add_widget(type, props)
-		}
-	}
 
 	let child_widget = (rel, index) => {
+
+		let controller = {
+			add_widget: (type, props) => {
+				add_widget(type, props)
+			},
+			set_self: (...args) => {
+				let el = miniStore.blocks[index()]
+				console.log("setting self", el, args)
+				setMiniStore("blocks", index(), ...args)
+				console.log(miniStore.blocks[index()])
+			}
+		}
+
 		let render_str = renderers[rel.type]
 		let render = return_renderer(render_str)
+
 
 		if (typeof render == "function") {
 			let c = render(rel, index, controller)
@@ -201,6 +209,8 @@ function group_widget(element, i) {
 			setMiniStore("blocks", index(), produce((el) => {
 				el.write = c.write
 				el.onfocus = c.onfocus
+				el.onkeydown = c.onkeydown
+				el.escape_handler = c.escape_handler
 			}))
 
 			let style = mem(() => `
@@ -214,20 +224,32 @@ function group_widget(element, i) {
 		}
 	}
 
-	let find_foucsed = () => miniStore.blocks.find((el) => el.focus)
+	let find_focused = () => miniStore.blocks.find((el) => el.focus)
 	let remove_block = (index) => setMiniStore("blocks", (e) => e.filter((r, i) => i != index))
-
-	let onkeydown = (e) => {
+	let escape_handler = (e) => {
 		if (e.key == "Escape") {
-			console.log("esc", find_foucsed())
-			if (!find_foucsed()) {
-				set_model("blocks", i(), "focus", false)
+			let focused = find_focused()
+			if (focused) {
+				// check if focused has an escape handler
+				let fn = focused.escape_handler
+				if (fn && "function" == typeof fn) { fn(e); return }
+				else { setMiniStore("blocks", (el) => el.focus, "focus", false) }
+			}
+			else {
+				control.set_self("focus", false);
 				cursor.set(-1)
 			}
-			setMiniStore("blocks", (el) => el.focus, "focus", false)
 		}
+	}
 
-		if (find_foucsed()) {
+	let onkeydown = (e) => {
+		escape_handler(e)
+
+		if (find_focused()) {
+			let fn = find_focused()?.onkeydown
+			console.log("focused", find_focused())
+			console.log("fn", fn)
+			if (fn && "function" == typeof fn) fn(e)
 			return
 		}
 
@@ -256,6 +278,10 @@ function group_widget(element, i) {
 		if (e.key == "k" && e.ctrlKey) {
 			add_widget("vect")
 		}
+
+		if (e.key == "g" && e.ctrlKey) {
+			add_widget("group")
+		}
 	}
 
 	return {
@@ -264,6 +290,7 @@ function group_widget(element, i) {
 		onediting: () => { },
 		onfocus: () => { },
 		onkeydown,
+		escape_handler,
 		write: (el) => save_m(el)
 	}
 }
