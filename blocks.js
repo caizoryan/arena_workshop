@@ -72,20 +72,17 @@ export function number_widget(element, i, controller) {
 }
 
 export function render_editor(element) {
-	let code = element?.source ? element?.source : ""
+	let code = mem(() => element?.source ? element?.source : "")
 	let name = sig(element?.name ? element?.name : "none")
-
-	let save
-
 	let uid = Math.random().toString(36).substring(7)
-	let focus;
 
+	let focus, save;
 
 	return ({
 		render: () => {
 
 			mounted(() => {
-				let editor = make_code_mirror(code, uid)
+				let editor = make_code_mirror(code(), uid)
 				focus = () => setTimeout(() => editor.focus(), 100)
 
 				save = function(el) {
@@ -111,6 +108,7 @@ export function render_editor(element) {
 				input [ type=text value=${name} oninput=${(e) => name.set(e.target.value)} ]
 				div [ class = ${"editor-" + uid} ]
 			`},
+
 		onfocus: () => focus(),
 		onselect: () => { },
 		onediting: () => { },
@@ -122,14 +120,14 @@ export function render_editor(element) {
 
 export function code_element(element) {
 
-	let code = element?.output ? element?.output : ""
+	let code = mem(() => element?.output ? element?.output : "")
 	let uid = Math.random().toString(36).substring(7)
 	let save, focus
 
 	return ({
 		render: () => {
 			mounted(() => {
-				let editor = make_code_mirror(code, uid)
+				let editor = make_code_mirror(code(), uid)
 				focus = () => setTimeout(() => editor.focus(), 100)
 
 				save = function(el) {

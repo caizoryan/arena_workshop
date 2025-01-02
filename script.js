@@ -1,19 +1,12 @@
 import { render, html, mem, mut, eff_on, mounted, sig, h, For, each, store, produce, when, eff } from "./solid_monke/solid_monke.js";
 import { batch, createStore } from "./solid_monke/mini-solid.js";
 import { make_code_mirror, vector, code_element, number_widget, render_editor } from "./blocks.js";
-
-
-
 import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment } from "./codemirror/bundled.js"
 
 let [renderers, set_renderers] = createStore({})
 
 let moodle = {
-	blocks: [
-		{ type: "group", output: "", blocks: [{ type: "number", output: "M.a = 14", num: 14, name: "a", id: "bbc" }], active: false, focus: false },
-		{ type: "group", output: "", blocks: [{ type: "default", output: "", id: "afrosa" }], active: false, focus: false },
-	],
-	renderers: {},
+	blocks: [{ type: "group", output: "", blocks: [], active: false, focus: false },],
 	cursor: 0
 }
 
@@ -29,7 +22,6 @@ load()
 let [model, set_model] = createStore(moodle, {})
 
 let remove_block = (index) => set_model("blocks", (e) => e.filter((r, i) => i != index))
-
 let find_active = () => model.blocks.find((el) => el.active)
 let find_focus = () => model.blocks.find((el) => el.focus)
 
@@ -53,14 +45,14 @@ eff_on(() => model.cursor, () => {
 
 let template = {
 	start: `
-<body></body>
-<script type="module">
+		<body></body>
+		<script type="module">
 
-import { mem, render, mut, sig, html, eff, eff_on, h} from "./solid_monke/solid_monke.js";
+		import { mem, render, mut, sig, html, eff, eff_on, h} from "./solid_monke/solid_monke.js";
 
-let M = mut({})
-document.M = M
-`,
+		let M = mut({})
+		document.M = M
+		`,
 	end: `</script>`
 }
 
@@ -153,12 +145,10 @@ function trigger_save() {
 }
 
 function find_offset_to_parent(el, parent) {
-
 	let found_parent = false
 	var curleft = 0, curtop = 0;
 
 	do {
-		console.log("top", el.offsetTop, el)
 		curleft += el.offsetLeft;
 		curtop += el.offsetTop;
 
@@ -288,8 +278,6 @@ function group_widget(element, i) {
 		if (e.key == "Backspace" && e.ctrlKey) {
 			remove_block(cursor())
 		}
-
-
 
 		if (e.key == "t" && e.ctrlKey) {
 			add_widget("default")
