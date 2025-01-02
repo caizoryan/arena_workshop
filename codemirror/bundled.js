@@ -65812,28 +65812,46 @@ var md_highlight = syntaxHighlighting(
     { tag: tags.meta, color: "darkgrey" }
   ])
 );
-Vim.defineEx(
-  "test",
-  "t",
-  function(cm2, operatorArgs, ranges, oldAnchor, newHead) {
-    console.log("hardWrap", cm2);
-  }
-);
 export {
   Compartment,
   EditorState,
   EditorView,
+  HighlightStyle,
   eslint4b_es_default as Linter,
   Vim,
+  autocompletion,
   basicSetup,
+  bracketMatching,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+  crosshairCursor,
+  defaultHighlightStyle,
+  defaultKeymap,
+  drawSelection,
+  dropCursor,
   esLint,
+  foldGutter,
+  foldKeymap,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  highlightSelectionMatches,
+  highlightSpecialChars,
+  history,
+  historyKeymap,
+  indentOnInput,
   javascript,
   keymap,
+  lineNumbers,
   lintGutter,
   linter,
   markdown,
   md_highlight,
   openLintPanel,
+  rectangularSelection,
+  searchKeymap,
+  syntaxHighlighting,
+  tags as t,
   vim
 };
 /*! Bundled license information:

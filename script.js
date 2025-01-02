@@ -1,7 +1,17 @@
 import { render, html, mem, mut, eff_on, mounted, sig, h, For, each, store, produce, when, eff } from "./solid_monke/solid_monke.js";
 import { batch, createStore } from "./solid_monke/mini-solid.js";
 import { make_code_mirror, vector, code_element, number_widget, render_editor } from "./blocks.js";
-import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment } from "./codemirror/bundled.js"
+import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment, syntaxHighlighting, HighlightStyle, t } from "./codemirror/bundled.js"
+import {
+	autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap,
+	searchKeymap, highlightSelectionMatches,
+	defaultKeymap, history, historyKeymap,
+	highlightSpecialChars, drawSelection, highlightActiveLine, dropCursor,
+	rectangularSelection, crosshairCursor,
+	lineNumbers, highlightActiveLineGutter,
+	defaultHighlightStyle, indentOnInput, bracketMatching,
+	foldGutter, foldKeymap,
+} from "./codemirror/bundled.js"
 
 let [renderers, set_renderers] = createStore({})
 
@@ -191,12 +201,7 @@ function group_widget(element, i, control) {
 			add_widget: (type, props) => {
 				add_widget(type, props)
 			},
-			set_self: (...args) => {
-				let el = miniStore.blocks[index()]
-				console.log("setting self", el, args)
-				setMiniStore("blocks", index(), ...args)
-				console.log(miniStore.blocks[index()])
-			}
+			set_self: (...args) => setMiniStore("blocks", index(), ...args)
 		}
 
 		let render_str = renderers[rel.type]
@@ -210,28 +215,28 @@ function group_widget(element, i, control) {
 				el.write = c.write
 				el.onfocus = c.onfocus
 				el.onkeydown = c.onkeydown
-				el.escape_handler = c.escape_handler
+				el.escape = c.escape
 			}))
 
 			let style = mem(() => `
-				border: ${rel.active ? "2px solid pink;" : null}
+				border: ${rel.active ? "1px solid grey;" : null}
 				box-shadow: ${rel.focus ? "0 0 25px 5px rgba(0,0,0,.1);" : null}
 				`
 			)
 
 
-			return () => h("div", { id: "block-" + rel.id, style: style, onmousedown: (e) => cursor.set(index) }, c.render)
+			return () => h("div.child", { id: "block-" + rel.id, style: style, onmousedown: (e) => cursor.set(index) }, c.render)
 		}
 	}
 
 	let find_focused = () => miniStore.blocks.find((el) => el.focus)
 	let remove_block = (index) => setMiniStore("blocks", (e) => e.filter((r, i) => i != index))
-	let escape_handler = (e) => {
+	let escape = (e) => {
 		if (e.key == "Escape") {
 			let focused = find_focused()
 			if (focused) {
 				// check if focused has an escape handler
-				let fn = focused.escape_handler
+				let fn = focused.escape
 				if (fn && "function" == typeof fn) { fn(e); return }
 				else { setMiniStore("blocks", (el) => el.focus, "focus", false) }
 			}
@@ -242,55 +247,69 @@ function group_widget(element, i, control) {
 		}
 	}
 
+
 	let onkeydown = (e) => {
-		escape_handler(e)
+		escape(e)
 
 		if (find_focused()) {
 			let fn = find_focused()?.onkeydown
-			console.log("focused", find_focused())
-			console.log("fn", fn)
 			if (fn && "function" == typeof fn) fn(e)
 			return
 		}
 
-		if (e.key == "ArrowDown") { cursor_next() }
-		if (e.key == "ArrowUp") { cursor_prev() }
-
-		if (e.key == "Enter") {
-			setMiniStore("blocks", cursor(), produce((el) => el.focus = true))
-			let fn = miniStore.blocks[cursor()]?.onfocus
-			if (fn && "function" == typeof fn) fn()
+		if (e.key == "f" && e.ctrlKey) {
+			toggle_fold()
 		}
 
-		if (e.key == "Backspace" && e.ctrlKey) {
-			remove_block(cursor())
-		}
+		if (!fold()) {
+			if (e.key == "ArrowDown") { cursor_next() }
+			if (e.key == "ArrowUp") { cursor_prev() }
 
-		if (e.key == "t" && e.ctrlKey) {
-			add_widget("default")
-		}
+			if (e.key == "Enter") {
+				setMiniStore("blocks", cursor(), produce((el) => el.focus = true))
+				let fn = miniStore.blocks[cursor()]?.onfocus
+				if (fn && "function" == typeof fn) fn()
+			}
 
-		if (e.key == "n" && e.ctrlKey) {
-			console.log("adding number")
-			add_widget("number")
-		}
+			if (e.key == "Backspace" && e.ctrlKey) {
+				remove_block(cursor())
+			}
 
-		if (e.key == "k" && e.ctrlKey) {
-			add_widget("vect")
-		}
+			if (e.key == "t" && e.ctrlKey) {
+				add_widget("default")
+			}
 
-		if (e.key == "g" && e.ctrlKey) {
-			add_widget("group")
+			if (e.key == "n" && e.ctrlKey) {
+				console.log("adding number")
+				add_widget("number")
+			}
+
+			if (e.key == "k" && e.ctrlKey) {
+				add_widget("vect")
+			}
+
+			if (e.key == "g" && e.ctrlKey) {
+				add_widget("group")
+			}
 		}
 	}
 
+	let fold = sig(false)
+	let toggle_fold = () => fold.set(!fold())
+	let show_which = mem(() => fold()
+		? null
+		: each(() => miniStore.blocks, (e, i) => child_widget(e, i)))
+
+	let fold_string = mem(() => fold() ? "▶︎" : "▼")
+
 	return {
-		render: () => h("div.group", each(() => miniStore.blocks, (e, i) => child_widget(e, i))),
+		render: () => h("div.group", h("p", { onclick: toggle_fold },
+			h("span.fold", fold_string)), show_which),
 		onselect: () => { },
 		onediting: () => { },
 		onfocus: () => { },
 		onkeydown,
-		escape_handler,
+		escape,
 		write: (el) => save_m(el)
 	}
 }
@@ -338,4 +357,125 @@ const recursive_fucking_children = (doc) => {
 	return text;
 };
 
+
+const createTheme = ({ variant, settings, styles }) => {
+	const theme = EditorView.theme(
+		{
+			// eslint-disable-next-line @typescript-eslint/naming-convention
+			'&': {
+				backgroundColor: settings.background,
+				color: settings.foreground,
+			},
+			'.cm-content': {
+				caretColor: settings.caret,
+			},
+			'.cm-cursor, .cm-dropCursor': {
+				borderLeftColor: settings.caret,
+			},
+			'&.cm-focused .cm-selectionBackgroundm .cm-selectionBackground, .cm-content ::selection':
+			{
+				backgroundColor: settings.selection,
+			},
+			'.cm-activeLine': {
+				backgroundColor: settings.lineHighlight,
+			},
+			'.cm-gutters': {
+				backgroundColor: settings.gutterBackground,
+				color: settings.gutterForeground,
+			},
+			'.cm-activeLineGutter': {
+				backgroundColor: settings.lineHighlight,
+			},
+		},
+		{
+			dark: variant === 'dark',
+		},
+	);
+
+	const highlightStyle = HighlightStyle.define(styles);
+	const extension = [theme, syntaxHighlighting(highlightStyle)];
+
+	return extension;
+};
+
+// Author: Zeno Rocha
+export const dracula = createTheme({
+	variant: 'light',
+	settings: {
+		background: '#fcfcfc',
+		foreground: '#5c6166',
+		caret: '#ffaa33',
+		selection: '#036dd626',
+		gutterBackground: '#fcfcfc',
+		gutterForeground: '#8a919966',
+		lineHighlight: '#8a91991a',
+	},
+	styles: [
+		{
+			tag: t.comment,
+			color: '#787b8099',
+		},
+		{
+			tag: t.string,
+			color: '#86b300',
+		},
+		{
+			tag: t.regexp,
+			color: '#4cbf99',
+		},
+		{
+			tag: [t.number, t.bool, t.null],
+			color: '#ffaa33',
+		},
+		{
+			tag: t.variableName,
+			color: '#5c6166',
+		},
+		{
+			tag: [t.definitionKeyword, t.modifier],
+			color: '#fa8d3e',
+		},
+		{
+			tag: [t.keyword, t.special(t.brace)],
+			color: '#fa8d3e',
+		},
+		{
+			tag: t.operator,
+			color: '#ed9366',
+		},
+		{
+			tag: t.separator,
+			color: '#5c6166b3',
+		},
+		{
+			tag: t.punctuation,
+			color: '#5c6166',
+		},
+		{
+			tag: [t.definition(t.propertyName), t.function(t.variableName)],
+			color: '#f2ae49',
+		},
+		{
+			tag: [t.className, t.definition(t.typeName)],
+			color: '#22a4e6',
+		},
+		{
+			tag: [t.tagName, t.typeName, t.self, t.labelName],
+			color: '#55b4d4',
+		},
+		{
+			tag: t.angleBracket,
+			color: '#55b4d480',
+		},
+		{
+			tag: t.attributeName,
+			color: '#f2ae49',
+		},
+	],
+});
+
 render(app, document.body);
+
+// setTimeout(() => {
+// 	$(".editor").draggable()
+// }, 1000)

@@ -1,5 +1,31 @@
-import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment } from "./codemirror/bundled.js"
+import { EditorState, syntaxHighlighting, EditorView, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment } from "./codemirror/bundled.js"
 import { html, mem, mounted, sig, } from "./solid_monke/solid_monke.js";
+import { dracula } from "./script.js";
+
+import {
+	autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap,
+	searchKeymap, highlightSelectionMatches,
+	defaultKeymap, history, historyKeymap,
+	highlightSpecialChars, drawSelection, highlightActiveLine, dropCursor,
+	rectangularSelection, crosshairCursor,
+	highlightActiveLineGutter,
+	defaultHighlightStyle, indentOnInput, bracketMatching,
+	foldGutter, foldKeymap,
+} from "./codemirror/bundled.js";
+
+let basicSetup = (() => [
+	highlightSpecialChars(),
+	highlightActiveLine(),
+	history(),
+	indentOnInput(),
+	drawSelection(),
+	closeBrackets(),
+	syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+	keymap.of([
+		...defaultKeymap,
+		...historyKeymap,
+	])
+])()
 
 export function number_widget(element, i, controller) {
 	let name = sig(element?.name ? element?.name : "variable")
@@ -155,11 +181,14 @@ export function code_element(element) {
 
 
 export function make_code_mirror(code, id) {
+	console.log("dracula", dracula)
 	let editor = new EditorView({
 		parent: document.querySelector(".editor-" + id),
 		state: EditorState.create({
 			doc: code,
 			extensions: [
+				dracula,
+
 				basicSetup,
 				javascript(),
 				linter(esLint(new Linter())),
