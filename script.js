@@ -216,6 +216,7 @@ function group_widget(element, i, control) {
 				el.write = c.write
 				el.onfocus = c.onfocus
 				el.onkeydown = c.onkeydown
+				el.onunfocus = c.onunfocus
 				el.escape = c.escape
 				el.toggle_fold = c.toggle_fold
 			}))
@@ -241,7 +242,7 @@ function group_widget(element, i, control) {
 		}
 	}
 
-	let find_focused = () => miniStore.blocks.find((el) => el.focus)
+	let find_focused = mem(() => miniStore.blocks.find((el) => el.focus))
 	let find_active = () => miniStore.blocks.find((el) => el.active)
 	let remove_block = (index) => setMiniStore("blocks", (e) => e.filter((r, i) => i != index))
 	let escape = (e) => {
@@ -251,13 +252,24 @@ function group_widget(element, i, control) {
 				// check if focused has an escape handler
 				let fn = focused.escape
 				if (fn && "function" == typeof fn) { fn(e); return }
-				else { setMiniStore("blocks", (el) => el.focus, "focus", false) }
+				else {
+					let block = miniStore.blocks.find((el) => el.focus)
+					console.log("block to unfocus", block)
+					setMiniStore("blocks", (el) => el.focus, "focus", false)
+					if (block.onunfocus) { block.onunfocus() }
+				}
 			}
 			else {
 				control.set_self("focus", false);
-				cursor.set(-1)
+				onunfocus()
 			}
 		}
+	}
+
+	let onunfocus = () => {
+		setMiniStore("blocks", (el) => el.focus, "focus", false)
+		setMiniStore("blocks", (el) => el.active, "active", false)
+		cursor.set(-1)
 	}
 
 
@@ -330,6 +342,7 @@ function group_widget(element, i, control) {
 		escape,
 		write: (el) => save_m(el),
 		toggle_fold,
+		onunfocus,
 	}
 }
 

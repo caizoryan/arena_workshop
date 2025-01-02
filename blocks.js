@@ -56,10 +56,6 @@ export function number_widget(element, i, controller) {
 			background: none;
 		}
 
-		p.out {
-		  color: #555;
-		}
-
 		.number-widget button {
 			all: unset;
 			border: 1px solid #555;
@@ -85,8 +81,6 @@ export function number_widget(element, i, controller) {
 			.controls
 				input [ type = range oninput=${(e) => num.set(e.target.value)} value=${num} min=0 max=255 step=1]
 				button [ onclick = ${() => { trigger_save() }}] -- set
-
-			p.out -- ${() => element.output}
 `
 	return ({
 		render: r,
