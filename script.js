@@ -1,12 +1,12 @@
 import { render, html, mem, mut, eff_on, mounted, sig, h, For, each, store, produce, when, eff } from "./solid_monke/solid_monke.js";
 import { batch, createStore } from "./solid_monke/mini-solid.js";
-import { vector, code_element, number_widget, render_editor } from "./blocks.js";
+import { make_code_mirror, vector, code_element, number_widget, render_editor } from "./blocks.js";
 
 
 
 import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment } from "./codemirror/bundled.js"
 
-let [renderers, setRenderers] = createStore({})
+let [renderers, set_renderers] = createStore({})
 
 let moodle = {
 	blocks: [
@@ -86,7 +86,7 @@ let compiled = mem(() => {
  * @param {string} renderer - passed as string, to be evaluated at runtime 
  */
 let register_renderer = (type, renderer) => {
-	set_model("renderers", type, renderer)
+	set_renderers(type, renderer)
 
 	// trigger a forced re-render when renderers are updated
 	let copy = [...model.blocks]
@@ -120,7 +120,7 @@ let app = () => {
 
 function any_widget(element, index) {
 	if (!element) return
-	let render_str = return_renderer(model.renderers[element.type])
+	let render_str = return_renderer(renderers[element.type])
 	let render = return_renderer(render_str)
 
 	if (typeof render == "function") {
@@ -237,7 +237,7 @@ function group_widget(element, i) {
 	}
 
 	let child_widget = (rel, index) => {
-		let render_str = model.renderers[rel.type]
+		let render_str = renderers[rel.type]
 		let render = return_renderer(render_str)
 
 		if (typeof render == "function") {
@@ -336,7 +336,7 @@ function register_model(key, signal) {
 window.onload = () => {
 	window.onkeydown = (e) => {
 		// happens no matter what
-		if (e.key == "Enter" && e.metaKey == true) {
+		if (e.key == "Enter" && (e.metaKey == true || e.altKey == true)) {
 			console.log("command enter")
 			trigger_save()
 		}
@@ -357,5 +357,18 @@ window.onload = () => {
 
 	}
 }
+
+const recursive_fucking_children = (doc) => {
+	let text = [];
+
+	if (doc.children) {
+		let children = doc.children;
+		children.forEach((child) => {
+			text = text.concat(recursive_fucking_children(child));
+		});
+	} else if (doc.text) return doc.text;
+
+	return text;
+};
 
 render(app, document.body);

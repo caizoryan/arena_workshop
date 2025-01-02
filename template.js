@@ -192,6 +192,7 @@ function draw(ctx) {
 	ctx.moveTo(0, 0)
 	ctx.lineTo(M.location.x, M.location.y);
 	ctx.stroke();
+	ctx.elipse(0, 0, 100, 100, 0, 0, Math.PI * 2)
 	requestAnimationFrame(() => draw(ctx))
 }
 

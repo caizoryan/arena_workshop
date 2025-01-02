@@ -1,5 +1,6 @@
 import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment } from "./codemirror/bundled.js"
 import { html, mem, mounted, sig, } from "./solid_monke/solid_monke.js";
+
 export function number_widget(element, i, controller) {
 	let name = sig(element?.name ? element?.name : "variable")
 	let num = register_model(name, element?.num ? element?.num : 0)
@@ -15,17 +16,12 @@ export function number_widget(element, i, controller) {
 		.number-widget {
 			padding: .5em;
 			font-family: monospace;
-			height: min-output;
-			box-shadow: none;
 		  
 		  display: grid;
 			grid-template-columns: 1fr 1fr;
-			grid-template-rows: 2fr 1fr;
 		}
 
-		.number-widget input[type="text"] {
-			margin: 0 .1em;
-		}
+		.number-widget input[type="text"] { margin: 0 .1em; }
 
 		.number-widget input[type="range"] {
 			border: 1px solid #000;
@@ -50,7 +46,7 @@ export function number_widget(element, i, controller) {
 		.number-widget [onclick=${(e) => {
 			if (e.shiftKey) {
 				controller.add_widget("block_editor", {
-					source: model.renderers[element.type],
+					source: renderers[element.type],
 					name: element.type
 				})
 			}
@@ -76,110 +72,31 @@ export function number_widget(element, i, controller) {
 }
 
 export function render_editor(element) {
-	let code = sig(element?.source ? element?.source : "")
+	let code = element?.source ? element?.source : ""
 	let name = sig(element?.name ? element?.name : "none")
 
-	let save = (el) => {
-		el.source = code()
-		el.name = name()
-		register_renderer(name(), code())
-	}
+	let save
 
-	return ({
-		render: () => html`
-			div [ class = "editor" ]
-				input [ type=text value=${name} oninput=${(e) => name.set(e.target.value)} ]
-				textarea [ value=${code} oninput=${(e) => code.set(e.target.value)} ]
-			`,
-		onselect: () => { },
-		onediting: () => { },
-		write: save
-
-	})
-}
-
-
-export function code_element(element) {
-	const recursive_fucking_children = (doc) => {
-		let text = [];
-
-		if (doc.children) {
-			let children = doc.children;
-			children.forEach((child) => {
-				text = text.concat(recursive_fucking_children(child));
-			});
-		} else if (doc.text) return doc.text;
-
-		return text;
-	};
-
-	let memo_code = mem(() => element?.output ? element?.output : "")
 	let uid = Math.random().toString(36).substring(7)
-	let save, focus
-	let write_enabled = sig(true)
+	let focus;
+
 
 	return ({
 		render: () => {
+
 			mounted(() => {
-				let readonly = new Compartment()
-
-				let editor = new EditorView({
-					parent: document.querySelector(".editor-" + uid),
-					state: EditorState.create({
-						doc: memo_code(),
-						extensions: [
-							basicSetup,
-							readonly.of(EditorState.readOnly.of(!write_enabled())),
-							javascript(),
-							linter(esLint(new Linter())),
-							lintGutter(),
-
-							keymap.of([
-								{
-									key: "Ctrl-y", run: () => {
-										let text = recursive_fucking_children(editor.state.doc).join("\n");
-										register_renderer("ass", text)
-									}
-								},
-								{
-									key: "Escape", run: () => {
-										write_enabled.set(false)
-										editor.dispatch({
-											effects: readonly.reconfigure(EditorState.readOnly.of(!write_enabled()))
-										})
-										editor.contentDOM.blur()
-										window.getSelection()?.removeAllRanges();
-									},
-
-								},
-								{
-									key: "Enter",
-									run: () => {
-										// if(!write_enabled())  
-										write_enabled.set(true)
-										editor.dispatch({
-											effects: readonly.reconfigure(EditorState.readOnly.of(!write_enabled()))
-										})
-									},
-									preventDefault: true,
-								}
-							])
-						]
-					})
-				})
-
-				focus = function() {
-					editor.focus()
-				}
+				let editor = make_code_mirror(code, uid)
+				focus = () => setTimeout(() => editor.focus(), 100)
 
 				save = function(el) {
-					element.focused = editor.hasFocus
+					el.focused = editor.hasFocus
 					let text = recursive_fucking_children(editor.state.doc).join("\n");
-					el.output = text
-					// set_code(index(), text)
-					element.cursor = editor.state.selection.ranges[0].from
-				}
+					el.cursor = editor.state.selection.ranges[0].from
 
+					el.source = text
+					el.name = name()
+					register_renderer(name(), text)
+				}
 
 				setTimeout(() => {
 					if (element.cursor && element.focused) {
@@ -188,15 +105,84 @@ export function code_element(element) {
 					}
 				}, 10)
 			})
-			return html`div [ class = ${"editor-" + uid} style=${mem(() => `opacity: ${write_enabled() ? 1 : .5}`)} ]`
+
+			return html`
+			div [ class = "editor" ]
+				input [ type=text value=${name} oninput=${(e) => name.set(e.target.value)} ]
+				div [ class = ${"editor-" + uid} ]
+			`},
+		onfocus: () => focus(),
+		onselect: () => { },
+		onediting: () => { },
+		write: (...args) => save(...args)
+
+	})
+}
+
+
+export function code_element(element) {
+
+	let code = element?.output ? element?.output : ""
+	let uid = Math.random().toString(36).substring(7)
+	let save, focus
+
+	return ({
+		render: () => {
+			mounted(() => {
+				let editor = make_code_mirror(code, uid)
+				focus = () => setTimeout(() => editor.focus(), 100)
+
+				save = function(el) {
+					el.focused = editor.hasFocus
+					let text = recursive_fucking_children(editor.state.doc).join("\n");
+					el.output = text
+					el.cursor = editor.state.selection.ranges[0].from
+				}
+
+				setTimeout(() => {
+					if (element.cursor && element.focused) {
+						editor.focus()
+						editor.dispatch({ selection: { anchor: element.cursor, head: element.cursor } })
+					}
+				}, 10)
+			})
+			return html`div [ class = ${"editor-" + uid} ]`
 		},
-		onfocus: () => { console.log("whore"); focus() },
+		onfocus: () => focus(),
 		onselect: () => { },
 		onediting: () => { },
 		write: (...args) => save(...args)
 	})
 }
 
+
+export function make_code_mirror(code, id) {
+	let editor = new EditorView({
+		parent: document.querySelector(".editor-" + id),
+		state: EditorState.create({
+			doc: code,
+			extensions: [
+				basicSetup,
+				javascript(),
+				linter(esLint(new Linter())),
+				lintGutter(),
+
+				keymap.of([
+					{
+						key: "Escape", run: () => {
+							editor.contentDOM.blur()
+							window.getSelection()?.removeAllRanges();
+						},
+
+					},
+				])
+			]
+		})
+	})
+
+	return editor
+
+}
 
 export function vector(e) {
 	let x = e?.x || 0, y = e?.y || 0
@@ -223,3 +209,4 @@ export function vector(e) {
 		write: (el) => { el.output = code(); el.name = name() }
 	}
 }
+
