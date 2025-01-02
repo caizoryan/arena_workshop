@@ -5,43 +5,16 @@ import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGu
 
 let [renderers, set_renderers] = createStore({})
 
-let moodle = {
-	blocks: [{ type: "group", output: "", blocks: [], active: false, focus: false },],
-	cursor: 0
-}
-
-let load = () => {
+let moodle = (function load() {
 	if (localStorage.getItem("model")) {
-		moodle = JSON.parse(localStorage.getItem("model"))
+		return JSON.parse(localStorage.getItem("model"))
+	} else {
+		return { blocks: [{ type: "group", output: "", blocks: [] },] }
 	}
-}
-
-load()
+})()
 
 
 let [model, set_model] = createStore(moodle, {})
-
-let remove_block = (index) => set_model("blocks", (e) => e.filter((r, i) => i != index))
-let find_active = () => model.blocks.find((el) => el.active)
-let find_focus = () => model.blocks.find((el) => el.focus)
-
-let set_cursor = (index) => set_model("cursor", index)
-
-let cursor_next = () => {
-	if (model.cursor < model.blocks.length - 1) { set_cursor(model.cursor + 1) }
-	else { set_cursor(0) }
-}
-
-let cursor_prev = () => {
-	if (model.cursor > 0) { set_cursor(model.cursor - 1) }
-	else { set_cursor(model.blocks.length - 1) }
-}
-
-eff_on(() => model.cursor, () => {
-	set_model("blocks", [0, model.blocks.length - 1], "focus", false)
-	set_model("blocks", (e, i) => i == model.cursor, "active", true)
-	set_model("blocks", (e, i) => i != model.cursor, "active", false)
-})
 
 let template = {
 	start: `
@@ -105,31 +78,23 @@ let m = () => document.querySelector("iframe")?.contentDocument.M
 
 let app = () => {
 	return h("div.container", [
-		h("div.editor", each(() => model.blocks, (e, i) => any_widget(e, i))),
+		h("div.editor", init_editor(model.blocks[0])),
 		h("iframe", { srcdoc: compiled, width: "98%", height: "98%" })
 	])
 }
 
-function any_widget(element, index) {
+function init_editor(element) {
 	if (!element) return
-	let render_str = return_renderer(renderers[element.type])
-	let render = return_renderer(render_str)
+	let render = return_renderer(renderers.group)
 
-	if (typeof render == "function") {
-		let c = render(element, index)
+	let c = render(element, () => 0)
 
-		set_model("blocks", index(), produce((el) => {
-			el.onkeydown = c.onkeydown
-			el.write = c.write
-		}))
+	set_model("blocks", 0, produce((el) => {
+		el.onkeydown = c.onkeydown
+		el.write = c.write
+	}))
 
-		let style = mem(() => `
-			${element.active ? "box-shadow: 0 0 5px 5px rgba(0, 0, 0, 0.05);" : null}
-			 ${element.focus ? "box-shadow: 0 0 10px 5px rgba(0, 0, 0, 0.1);transform: scale(1.01)" : null}
-		`)
-
-		return () => h("div", { style: style, onmousedown: (e) => set_cursor(index()) }, c.render)
-	}
+	return c.render
 }
 
 function trigger_save() {
@@ -329,20 +294,7 @@ window.onload = () => {
 			trigger_save()
 		}
 
-		// if no elment is in focus
-		if (!find_focus()) {
-			if (e.key == "Enter") {
-				set_model("blocks", model.cursor, "focus", true)
-			}
-			if (e.key == "ArrowDown") { e.preventDefault(); cursor_next() }
-			if (e.key == "ArrowUp") { e.preventDefault(); cursor_prev() }
-		}
-
-		// if there is an element active,
-		// forward the event to it
-		let focused = find_focus()
-		if (focused?.onkeydown) { focused.onkeydown(e); return }
-
+		model.blocks[0].onkeydown(e)
 	}
 }
 
