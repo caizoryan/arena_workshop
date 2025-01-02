@@ -2,17 +2,16 @@ import { render, html, mem, mut, eff_on, mounted, sig, h, For, each, store, prod
 import { batch, createStore } from "./solid_monke/mini-solid.js";
 import { vector, code_element, number_widget, render_editor } from "./blocks.js";
 
+
+
 import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment } from "./codemirror/bundled.js"
+
+let [renderers, setRenderers] = createStore({})
 
 let moodle = {
 	blocks: [
-		{
-			type: "group", output: "", blocks: [
-				{ type: "number", output: "M.ass = 14", num: 14, name: "ass", id: "bbc" },
-				{ type: "default", output: "", id: "afrosa" }
-			], active: false, focus: false
-		},
-		{ type: "group", output: "", blocks: [{ type: "number", output: "M.ass = 14", num: 14, name: "ass", id: "cool" },], active: false, focus: false },
+		{ type: "group", output: "", blocks: [{ type: "number", output: "M.a = 14", num: 14, name: "a", id: "bbc" }], active: false, focus: false },
+		{ type: "group", output: "", blocks: [{ type: "default", output: "", id: "afrosa" }], active: false, focus: false },
 	],
 	renderers: {},
 	cursor: 0
