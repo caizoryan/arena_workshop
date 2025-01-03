@@ -72,7 +72,7 @@ let register_renderer = (type, renderer) => {
 
 /** returns a renderer function
 * @param {string} str - code to be evaluated
-* @returns {(a: any, b:any ) => Renderer}
+* @returns {(element: any, index:any, controller:any ) => Renderer }
 */
 function return_renderer(str) {
 	let fn = eval_code(str)
@@ -99,14 +99,9 @@ function init_editor(element) {
 	let control = {
 		set_self: (...args) => set_model("blocks", 0, ...args)
 	}
-
 	let c = render(element, () => 0, control)
 
-	set_model("blocks", 0, produce((el) => {
-		el.onkeydown = c.onkeydown
-		el.write = c.write
-	}))
-
+	set_model("blocks", 0, produce((el) => { el.onkeydown = c.onkeydown; el.write = c.write }))
 	return c.render
 }
 
@@ -148,8 +143,17 @@ function group_widget(element, i, control) {
 	let [miniStore, setMiniStore] = createStore({ blocks: [...blocks], })
 
 	let cursor = sig(-1)
-	let cursor_next = () => miniStore.blocks.length > cursor() + 1 ? cursor.set(cursor() + 1) : null
-	let cursor_prev = () => cursor() > 0 ? cursor.set(cursor() - 1) : null
+	let cursor_next = () => miniStore.blocks.length > cursor() + 1 ? cursor.set(cursor() + 1) : cursor.set(0)
+	let cursor_prev = () => cursor() > 0 ? cursor.set(cursor() - 1) : cursor.set(miniStore.blocks.length - 1)
+
+	let move_child = (index, direction) => {
+		setMiniStore("blocks", produce((el) => {
+			if (!el[index + direction] || !el[index]) return
+			let temp = el[index]
+			el[index] = el[index + direction]
+			el[index + direction] = temp
+		}))
+	}
 
 	eff_on(cursor, () => {
 		batch(() => {
@@ -171,20 +175,6 @@ function group_widget(element, i, control) {
 		})
 	})
 
-	function save_m(el) {
-		let save_queue = miniStore.blocks.map((code) => code.write)
-		batch(() =>
-			save_queue.forEach((code, i) =>
-				"function" == typeof code
-					? setMiniStore("blocks", i, produce((el) => code(el)))
-					: null)
-		)
-
-		let output = miniStore.blocks.map((child) => child.output).join("\n")
-		el.output = output
-		el.blocks = miniStore.blocks
-		el.fold = fold()
-	}
 
 	let add_widget = (type, state) => {
 		trigger_save()
@@ -197,17 +187,13 @@ function group_widget(element, i, control) {
 
 
 	let child_widget = (rel, index) => {
-
 		let controller = {
-			add_widget: (type, props) => {
-				add_widget(type, props)
-			},
+			add_widget: (type, props) => add_widget(type, props),
 			set_self: (...args) => setMiniStore("blocks", index(), ...args)
 		}
 
 		let render_str = renderers[rel.type]
 		let render = return_renderer(render_str)
-
 
 		if (typeof render == "function") {
 			let c = render(rel, index, controller)
@@ -222,11 +208,10 @@ function group_widget(element, i, control) {
 			}))
 
 			let style = mem(() => `
-				border: ${rel.active ? "1px solid grey;" : null}
-				box-shadow: ${rel.focus ? "0 0 25px 5px rgba(0,0,0,.1);" : null}
+				border: ${rel.active && !rel.focus ? "1px solid grey" : null};
+				box-shadow: ${rel.focus ? "0 0 25px 5px rgba(0,0,0,.1)" : null};
 				`
 			)
-
 
 			return () => h("div.child", {
 				id: "block-" + rel.id, style: style, onmousedown: (e) => {
@@ -266,6 +251,21 @@ function group_widget(element, i, control) {
 		}
 	}
 
+	function save_m(el) {
+		let save_queue = miniStore.blocks.map((code) => code.write)
+		batch(() =>
+			save_queue.forEach((code, i) =>
+				"function" == typeof code
+					? setMiniStore("blocks", i, produce((el) => code(el)))
+					: null)
+		)
+
+		let output = miniStore.blocks.map((child) => child.output).join("\n")
+		el.output = output
+		el.blocks = miniStore.blocks
+		el.fold = fold()
+	}
+
 	let onunfocus = () => {
 		setMiniStore("blocks", (el) => el.focus, "focus", false)
 		setMiniStore("blocks", (el) => el.active, "active", false)
@@ -292,8 +292,16 @@ function group_widget(element, i, control) {
 				}
 			}
 
-			if (e.key == "ArrowDown") { cursor_next() }
-			if (e.key == "ArrowUp") { cursor_prev() }
+			if (e.key == "ArrowDown") {
+				if (e.altKey == true && e.shiftKey == true) move_child(cursor(), 1)
+				cursor_next()
+			}
+
+			if (e.key == "ArrowUp") {
+				if (e.altKey == true && e.shiftKey == true) move_child(cursor(), -1)
+				cursor_prev()
+			}
+
 
 			if (e.key == "Enter") {
 				setMiniStore("blocks", cursor(), produce((el) => el.focus = true))
@@ -310,7 +318,6 @@ function group_widget(element, i, control) {
 			}
 
 			if (e.key == "n" && e.ctrlKey) {
-				console.log("adding number")
 				add_widget("number")
 			}
 
@@ -336,8 +343,10 @@ function group_widget(element, i, control) {
 		render: () => h("div.group", h("p", { onclick: toggle_fold },
 			h("span.fold", fold_string)), show_which),
 		onselect: () => { },
-		onediting: () => { },
-		onfocus: () => { },
+		onfocus: () => {
+			if (fold()) toggle_fold()
+			cursor.set(0)
+		},
 		onkeydown,
 		escape,
 		write: (el) => save_m(el),
@@ -437,7 +446,7 @@ const createTheme = ({ variant, settings, styles }) => {
 export const dracula = createTheme({
 	variant: 'light',
 	settings: {
-		background: '#f9f9f9',
+		background: '#f9f9f911',
 		foreground: '#5c6166',
 		caret: '#ffaa33',
 		selection: '#036dd626',

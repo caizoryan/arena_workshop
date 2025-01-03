@@ -50,19 +50,10 @@ export function number_widget(element, i, controller) {
 		.number-widget input[type="text"] { margin: 0 .1em; }
 
 		.number-widget input[type="range"] {
-			border: 1px solid #000;
 			margin: 0 .1em;
-			padding: .2em;
-			background: none;
+			background: #000;
 		}
 
-		.number-widget button {
-			all: unset;
-			border: 1px solid #555;
-			padding: .1em;
-		  margin: 0 .1em;
-		  cursor: pointer;
-		}
 
 		---
 		.number-widget [onclick=${(e) => {
@@ -80,7 +71,6 @@ export function number_widget(element, i, controller) {
 
 			.controls
 				input [ type = range oninput=${(e) => num.set(e.target.value)} value=${num} min=0 max=255 step=1]
-				button [ onclick = ${() => { trigger_save() }}] -- set
 `
 	return ({
 		render: r,
@@ -207,7 +197,6 @@ export function make_code_mirror(code, id) {
 				basicSetup,
 				javascript(),
 				linter(esLint(lin, config)),
-				lintGutter(),
 
 				keymap.of([
 					{
