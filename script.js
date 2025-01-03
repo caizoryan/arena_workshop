@@ -396,6 +396,10 @@ window.onload = () => {
 			trigger_save()
 		}
 
+		if (e.key == "ArrowDown" || e.key == "ArrowUp") {
+			e.preventDefault()
+		}
+
 		model.blocks[0].onkeydown(e)
 	}
 }
