@@ -121,26 +121,7 @@ function is_scrollable(el) {
 	return el.scrollHeight > el.clientHeight
 }
 function find_offset_to_parent(el, parent) {
-	let found_parent = false
-	var curleft = el.offsetLeft, curtop = el.offsetTop;
-	console.log("finding offset to parent", el, parent)
-
-	do {
-		console.log("setting to", el.parentElement)
-		el = el.parentElement;
-
-		if (el === parent) {
-			console.log("found parent, curtop is: ", curtop)
-			console.log("parent top", parent.offsetTop)
-			curtop -= parent.offsetTop
-			curleft -= parent.offsetLeft
-			console.log("curtop is now", curtop)
-			found_parent = true
-		}
-
-	} while (!found_parent && el);
-
-	return [curleft, curtop];
+	return [(el.offsetLeft - parent.offsetLeft), (el.offsetTop - parent.offsetTop)];
 }
 
 function group_widget(element, i, control) {
@@ -201,12 +182,7 @@ function group_widget(element, i, control) {
 						let parent = get_scrollabe_parent(el)
 						let [x, y] = find_offset_to_parent(el, parent)
 
-						console.log("scrolling to", x, y)
-						// parent.scrollTop = y - 100
 						parent.scrollTo({ top: y - 50, behavior: "smooth" })
-
-						// el?.scrollIntoView({ block: "start", inline: "center" });
-						// parent.scrollTop -= 100
 
 					} else { e.active = false }
 				})
