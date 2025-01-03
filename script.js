@@ -1,4 +1,4 @@
-import { render, html, mem, mut, eff_on, mounted, sig, h, For, each, store, produce, when, eff } from "./solid_monke/solid_monke.js";
+import { render, html, mem, mut, eff_on, mounted, sig, h, For, each, store, produce, when, eff, p } from "./solid_monke/solid_monke.js";
 import { batch, createStore } from "./solid_monke/mini-solid.js";
 import { make_code_mirror, vector, code_element, number_widget, render_editor } from "./blocks.js";
 import { EditorState, EditorView, basicSetup, javascript, keymap, esLint, lintGutter, linter, Linter, Compartment, syntaxHighlighting, HighlightStyle, t } from "./codemirror/bundled.js"
@@ -117,17 +117,24 @@ function trigger_save() {
 	localStorage.setItem("model", JSON.stringify(model))
 }
 
+function is_scrollable(el) {
+	return el.scrollHeight > el.clientHeight
+}
 function find_offset_to_parent(el, parent) {
 	let found_parent = false
-	var curleft = 0, curtop = 0;
+	var curleft = el.offsetLeft, curtop = el.offsetTop;
+	console.log("finding offset to parent", el, parent)
 
 	do {
-		curleft += el.offsetLeft;
-		curtop += el.offsetTop;
-
-		el = el.offsetParent;
+		console.log("setting to", el.parentElement)
+		el = el.parentElement;
 
 		if (el === parent) {
+			console.log("found parent, curtop is: ", curtop)
+			console.log("parent top", parent.offsetTop)
+			curtop -= parent.offsetTop
+			curleft -= parent.offsetLeft
+			console.log("curtop is now", curtop)
 			found_parent = true
 		}
 
@@ -154,8 +161,7 @@ function group_widget(element, i, control) {
 			el[index + direction] = temp
 		}))
 	}
-	function isElementInViewport(el) {
-
+	function isElementInViewport(el, parent) {
 		var rect = el.getBoundingClientRect();
 
 		return (
@@ -165,6 +171,24 @@ function group_widget(element, i, control) {
 			rect.right <= (window.innerWidth || document.documentElement.clientWidth) /* or $(window).width() */
 		);
 	}
+
+	function get_scrollabe_parent(el) {
+		console.log("el", el, "parent", el.parentElement)
+		let found_parent = false
+		let element = el
+
+		do {
+			element = element.parentElement
+
+			if (element.scrollHeight > element.clientHeight) {
+				found_parent = true
+			}
+
+		} while (!found_parent && element);
+
+		console.log("scrollable parent", element)
+		return element
+	}
 	eff_on(cursor, () => {
 		batch(() => {
 			setMiniStore("blocks", produce((el) => {
@@ -172,13 +196,17 @@ function group_widget(element, i, control) {
 					if (ii === cursor()) {
 						e.active = true
 						let id = "block-" + e.id
-						let parent = document.querySelector(".editor")
-						let el = document.getElementById(id)
 
-						if (!isElementInViewport(el)) {
-							let [x, y] = find_offset_to_parent(el, parent)
-							parent?.scrollTo({ behavior: "smooth", top: y - 100 })
-						}
+						let el = document.getElementById(id)
+						let parent = get_scrollabe_parent(el)
+						let [x, y] = find_offset_to_parent(el, parent)
+
+						console.log("scrolling to", x, y)
+						// parent.scrollTop = y - 100
+						parent.scrollTo({ top: y - 50, behavior: "smooth" })
+
+						// el?.scrollIntoView({ block: "start", inline: "center" });
+						// parent.scrollTop -= 100
 
 					} else { e.active = false }
 				})

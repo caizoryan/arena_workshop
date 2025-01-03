@@ -212,7 +212,6 @@ export function make_code_mirror(code, id) {
 	})
 
 	return editor
-
 }
 
 export function vector(e) {
