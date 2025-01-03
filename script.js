@@ -125,8 +125,7 @@ function find_offset_to_parent(el, parent) {
 }
 
 function group_widget(element, i, control) {
-	let trash = []
-
+	let buffer
 	let blocks = element.blocks || []
 	let [miniStore, setMiniStore] = createStore({ blocks: [...blocks], })
 
@@ -245,6 +244,7 @@ function group_widget(element, i, control) {
 	let find_focused = mem(() => miniStore.blocks.find((el) => el.focus))
 	let find_active = () => miniStore.blocks.find((el) => el.active)
 	let remove_block = (index) => setMiniStore("blocks", (e) => e.filter((r, i) => i != index))
+	// TODO: fix this, it's disabling child and its children.
 	let escape = (e) => {
 		if (e.key == "Escape") {
 			let focused = find_focused()
@@ -266,7 +266,7 @@ function group_widget(element, i, control) {
 		}
 	}
 
-	function save_m(el) {
+	function save(el) {
 		let save_queue = miniStore.blocks.map((code) => code.write)
 		batch(() =>
 			save_queue.forEach((code, i) =>
@@ -299,6 +299,28 @@ function group_widget(element, i, control) {
 
 
 		if (!fold()) {
+			if (e.key == "y") {
+				let active = find_active()
+				if (active) {
+					let copy = JSON.parse(JSON.stringify(active))
+					copy.id = Math.random().toString(36).substring(7)
+					//
+					// TODO: Make this recursive
+					if (copy.blocks) {
+						copy.blocks = copy.blocks.map((el) => {
+							el.id = Math.random().toString(36).substring(7)
+							return el
+						})
+					}
+					buffer = copy
+				}
+			}
+
+			if (e.key == "p") {
+				if (!buffer) return
+				setMiniStore("blocks", produce((el) => el.push(buffer)))
+			}
+
 			if (e.key == "F") {
 				let active = find_active()
 				if (active) {
@@ -364,7 +386,7 @@ function group_widget(element, i, control) {
 		},
 		onkeydown,
 		escape,
-		write: (el) => save_m(el),
+		write: (el) => save(el),
 		toggle_fold,
 		onunfocus,
 	}
