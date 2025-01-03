@@ -237,7 +237,7 @@ export function vector(e) {
 					p -- ${code}`,
 		onselect: () => { },
 		onediting: () => { },
-		write: (el) => { el.output = code(); el.name = name() }
+		write: (el) => { el.output = code(); el.name = name(), el.x = vect().x, el.y = vect().y }
 	}
 }
 

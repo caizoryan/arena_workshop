@@ -154,7 +154,17 @@ function group_widget(element, i, control) {
 			el[index + direction] = temp
 		}))
 	}
+	function isElementInViewport(el) {
 
+		var rect = el.getBoundingClientRect();
+
+		return (
+			rect.top >= 0 &&
+			rect.left >= 0 &&
+			rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) && /* or $(window).height() */
+			rect.right <= (window.innerWidth || document.documentElement.clientWidth) /* or $(window).width() */
+		);
+	}
 	eff_on(cursor, () => {
 		batch(() => {
 			setMiniStore("blocks", produce((el) => {
@@ -165,9 +175,10 @@ function group_widget(element, i, control) {
 						let parent = document.querySelector(".editor")
 						let el = document.getElementById(id)
 
-						let [x, y] = find_offset_to_parent(el, parent)
-
-						parent?.scrollTo({ behavior: "smooth", top: y - 100 })
+						if (!isElementInViewport(el)) {
+							let [x, y] = find_offset_to_parent(el, parent)
+							parent?.scrollTo({ behavior: "smooth", top: y - 100 })
+						}
 
 					} else { e.active = false }
 				})
